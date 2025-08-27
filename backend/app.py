@@ -7,7 +7,7 @@ from starlette.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from typing import Optional, List
-from sqlmodel import Session as DBSession, select, select
+from sqlmodel import Session as DBSession, select
 from sqlalchemy import text
 from datetime import datetime, timedelta
 from pathlib import Path
