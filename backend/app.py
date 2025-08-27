@@ -74,15 +74,17 @@ def admin_session_required(request: Request):
 
 def csrf_token(request: Request):
     tok = request.session.get("csrf_token")
-
-
-def _get_csrf_from_form(form: dict) -> str:
-    """Accept either 'csrf' or 'csrf_token' field names from the form."""
-    return (form.get('csrf') or form.get('csrf_token') or '')
     if not tok:
         tok = secrets.token_urlsafe(32)
         request.session["csrf_token"] = tok
     return tok
+
+templates.env.globals["csrf_token"] = csrf_token
+
+
+def _get_csrf_from_form(form: dict) -> str:
+    """Accept either 'csrf' or 'csrf_token' field names from the form."""
+    return form.get("csrf") or form.get("csrf_token") or ""
 
 def require_csrf(request: Request, token: str):
     if token != request.session.get("csrf_token"):
@@ -399,18 +401,6 @@ async def admin_settings_save(request: Request, csrf: str = Form(...), site_titl
     flash(request, "Settings saved", "success")
     audit(request.session.get("admin_user","admin"), "settings", "settings", "-", before, {"theme":theme,"logo_url":logo_url}, get_ip(request))
     return RedirectResponse("/admin/settings", status_code=303)
-
-
-# --- CSRF helper (very simple session-based token) ---
-def csrf_token(request):
-    tok = request.session.get("_csrf")
-    if not tok:
-        import secrets
-        tok = secrets.token_hex(16)
-        request.session["_csrf"] = tok
-    return tok
-templates.env.globals["csrf_token"] = csrf_token
-
 
 
 @app.post("/admin/login")
