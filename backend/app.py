@@ -421,49 +421,34 @@ async def admin_login(request: Request):
     form = dict(await request.form())
     token = _get_csrf_from_form(form)
     if token != request.session.get("csrf_token"):
-        t = csrf_token(request)
-    resp = templates.TemplateResponse(
+        return templates.TemplateResponse(
             "admin_login.html",
-            {"request": request, "title": "Login", "error": "CSRF token invalid"},
-            status_code=400
+            {
+                "request": request,
+                "title": "Login",
+                "error": "CSRF token invalid",
+                "csrf": csrf_token(request),
+            },
+            status_code=400,
         )
+
     username = form.get("username", "")
     password = form.get("password", "")
-    if username == os.getenv("ADMIN_USER", "admin") and password == os.getenv("ADMIN_PASS", "admin"):
+    if username == settings.ADMIN_USER and password == settings.ADMIN_PASS:
         request.session["admin"] = True
         request.session["csrf_token"] = token_urlsafe(32)  # rotate token
         return RedirectResponse(url="/admin", status_code=303)
-    t = csrf_token(request)
-    resp = templates.TemplateResponse(
+
+    return templates.TemplateResponse(
         "admin_login.html",
-        {"request": request, "title": "Login", "error": "Invalid credentials"},
-        status_code=400
+        {
+            "request": request,
+            "title": "Login",
+            "error": "Invalid credentials",
+            "csrf": csrf_token(request),
+        },
+        status_code=400,
     )
-
-
-@app.post("/admin/login")
-async def admin_login_submit(request: Request,
-    username: str = Form(...),
-    password: str = Form(...),
-    csrf: str = Form(...)):
-    session_csrf = request.session.get("csrf_token")
-    if not session_csrf or csrf != session_csrf:
-        t = csrf_token(request)
-    resp = templates.TemplateResponse(
-            "admin_login.html",
-            {"request": request, "title": "Admin Login", "error": "Invalid CSRF token"},
-            status_code=400,
-        )
-    if username == "admin" and password == "admin":
-        request.session["admin"] = True
-        return RedirectResponse(url="/admin", status_code=303)
-    t = csrf_token(request)
-    resp = templates.TemplateResponse(
-        "admin_login.html",
-        {"request": request, "title": "Admin Login", "error": "Invalid credentials"},
-        status_code=401,
-    )
-
 
 @app.get("/admin/seed")
 def _admin_seed(request: Request, _=Depends(admin_session_required)):
