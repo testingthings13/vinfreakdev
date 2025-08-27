@@ -1,6 +1,7 @@
 from sqlmodel import create_engine, SQLModel, Session
 from sqlalchemy import text
 from backend_settings import settings
+from models import Make, Model, Category
 
 
 def ensure_columns():
@@ -13,6 +14,9 @@ def ensure_columns():
             "lot_number": "TEXT",
             "seller_rating": "REAL",
             "seller_reviews": "INTEGER",
+            "make_id": "INTEGER",
+            "model_id": "INTEGER",
+            "category_id": "INTEGER",
         }
         for col, typ in wanted.items():
             if col not in have:
@@ -29,6 +33,8 @@ engine = create_engine(
 
 def init_db():
     # Create non-cars tables from metadata
+    SQLModel.metadata.create_all(engine, tables=[Make.__table__, Model.__table__, Category.__table__])
+    ensure_columns()
     # --- ensure cars.lot_number exists for legacy DBs ---
     try:
         from sqlmodel import Session

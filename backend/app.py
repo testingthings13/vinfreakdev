@@ -35,6 +35,10 @@ def require_admin(
 import io, csv, json, os, secrets, time
 from db import engine, init_db
 from models import Car, Media, ImportJob, Setting, AdminAudit
+try:
+    from models import Make, Model, Category
+except Exception:  # during tests models may be stubbed
+    Make = Model = Category = None
 
 app = FastAPI(title="Vinfreak Backend")
 
@@ -185,6 +189,190 @@ def admin_index(request: Request, _=Depends(admin_session_required)):
         {"request": request, "title": "Dashboard", "flash": pop_flash(request)},
     )
 
+# ----- Taxonomy: Makes -----
+@app.get("/admin/makes", response_class=HTMLResponse)
+def admin_makes(request: Request, _=Depends(admin_session_required)):
+    with DBSession(engine) as s:
+        items = s.exec(select(Make).order_by(Make.name)).all()
+    return templates.TemplateResponse(
+        "admin_makes.html",
+        {"request": request, "items": items, "title": "Makes", "flash": pop_flash(request)},
+    )
+
+@app.get("/admin/makes/new", response_class=HTMLResponse)
+def admin_make_new(request: Request, _=Depends(admin_session_required)):
+    return templates.TemplateResponse(
+        "admin_make_edit.html",
+        {"request": request, "item": None, "action": "/admin/makes/new", "title": "New Make", "csrf": csrf_token(request), "flash": pop_flash(request)},
+    )
+
+@app.post("/admin/makes/new")
+def admin_make_create(request: Request, csrf: str = Form(...), name: str = Form(...), _=Depends(admin_session_required)):
+    require_csrf(request, csrf)
+    with DBSession(engine) as s:
+        m = Make(name=name)
+        s.add(m); s.commit()
+        audit(request.session.get("admin_user","admin"), "create", "makes", m.id, None, {"name": name}, get_ip(request))
+    flash(request, "Make created", "success")
+    return RedirectResponse("/admin/makes", status_code=303)
+
+@app.get("/admin/makes/{make_id}", response_class=HTMLResponse)
+def admin_make_edit(request: Request, make_id: int, _=Depends(admin_session_required)):
+    with DBSession(engine) as s:
+        item = s.get(Make, make_id)
+    return templates.TemplateResponse(
+        "admin_make_edit.html",
+        {"request": request, "item": item, "action": f"/admin/makes/{make_id}", "title": "Edit Make", "csrf": csrf_token(request), "flash": pop_flash(request)},
+    )
+
+@app.post("/admin/makes/{make_id}")
+def admin_make_update(request: Request, make_id: int, csrf: str = Form(...), name: str = Form(...), _=Depends(admin_session_required)):
+    require_csrf(request, csrf)
+    with DBSession(engine) as s:
+        item = s.get(Make, make_id)
+        before = item.__dict__.copy() if item else None
+        if item:
+            item.name = name
+            s.add(item); s.commit()
+            audit(request.session.get("admin_user","admin"), "update", "makes", make_id, before, {"name": name}, get_ip(request))
+    flash(request, "Make updated", "success")
+    return RedirectResponse("/admin/makes", status_code=303)
+
+@app.get("/admin/makes/{make_id}/delete")
+def admin_make_delete(request: Request, make_id: int, _=Depends(admin_session_required)):
+    with DBSession(engine) as s:
+        item = s.get(Make, make_id)
+        if item:
+            before = item.__dict__.copy()
+            s.delete(item); s.commit()
+            audit(request.session.get("admin_user","admin"), "delete", "makes", make_id, before, None, get_ip(request))
+    flash(request, "Make deleted", "success")
+    return RedirectResponse("/admin/makes", status_code=303)
+
+# ----- Taxonomy: Categories -----
+@app.get("/admin/categories", response_class=HTMLResponse)
+def admin_categories(request: Request, _=Depends(admin_session_required)):
+    with DBSession(engine) as s:
+        items = s.exec(select(Category).order_by(Category.name)).all()
+    return templates.TemplateResponse(
+        "admin_categories.html",
+        {"request": request, "items": items, "title": "Categories", "flash": pop_flash(request)},
+    )
+
+@app.get("/admin/categories/new", response_class=HTMLResponse)
+def admin_category_new(request: Request, _=Depends(admin_session_required)):
+    return templates.TemplateResponse(
+        "admin_category_edit.html",
+        {"request": request, "item": None, "action": "/admin/categories/new", "title": "New Category", "csrf": csrf_token(request), "flash": pop_flash(request)},
+    )
+
+@app.post("/admin/categories/new")
+def admin_category_create(request: Request, csrf: str = Form(...), name: str = Form(...), _=Depends(admin_session_required)):
+    require_csrf(request, csrf)
+    with DBSession(engine) as s:
+        c = Category(name=name)
+        s.add(c); s.commit()
+        audit(request.session.get("admin_user","admin"), "create", "categories", c.id, None, {"name": name}, get_ip(request))
+    flash(request, "Category created", "success")
+    return RedirectResponse("/admin/categories", status_code=303)
+
+@app.get("/admin/categories/{cat_id}", response_class=HTMLResponse)
+def admin_category_edit(request: Request, cat_id: int, _=Depends(admin_session_required)):
+    with DBSession(engine) as s:
+        item = s.get(Category, cat_id)
+    return templates.TemplateResponse(
+        "admin_category_edit.html",
+        {"request": request, "item": item, "action": f"/admin/categories/{cat_id}", "title": "Edit Category", "csrf": csrf_token(request), "flash": pop_flash(request)},
+    )
+
+@app.post("/admin/categories/{cat_id}")
+def admin_category_update(request: Request, cat_id: int, csrf: str = Form(...), name: str = Form(...), _=Depends(admin_session_required)):
+    require_csrf(request, csrf)
+    with DBSession(engine) as s:
+        item = s.get(Category, cat_id)
+        before = item.__dict__.copy() if item else None
+        if item:
+            item.name = name
+            s.add(item); s.commit()
+            audit(request.session.get("admin_user","admin"), "update", "categories", cat_id, before, {"name": name}, get_ip(request))
+    flash(request, "Category updated", "success")
+    return RedirectResponse("/admin/categories", status_code=303)
+
+@app.get("/admin/categories/{cat_id}/delete")
+def admin_category_delete(request: Request, cat_id: int, _=Depends(admin_session_required)):
+    with DBSession(engine) as s:
+        item = s.get(Category, cat_id)
+        if item:
+            before = item.__dict__.copy()
+            s.delete(item); s.commit()
+            audit(request.session.get("admin_user","admin"), "delete", "categories", cat_id, before, None, get_ip(request))
+    flash(request, "Category deleted", "success")
+    return RedirectResponse("/admin/categories", status_code=303)
+
+# ----- Taxonomy: Models -----
+@app.get("/admin/models", response_class=HTMLResponse)
+def admin_models(request: Request, _=Depends(admin_session_required)):
+    with DBSession(engine) as s:
+        rows = s.exec(text("SELECT models.id, models.name, models.make_id, makes.name AS make_name FROM models LEFT JOIN makes ON models.make_id = makes.id ORDER BY models.name")).mappings().all()
+    return templates.TemplateResponse(
+        "admin_models.html",
+        {"request": request, "items": rows, "title": "Models", "flash": pop_flash(request)},
+    )
+
+@app.get("/admin/models/new", response_class=HTMLResponse)
+def admin_model_new(request: Request, _=Depends(admin_session_required)):
+    with DBSession(engine) as s:
+        makes = s.exec(select(Make).order_by(Make.name)).all()
+    return templates.TemplateResponse(
+        "admin_model_edit.html",
+        {"request": request, "item": None, "makes": makes, "action": "/admin/models/new", "title": "New Model", "csrf": csrf_token(request), "flash": pop_flash(request)},
+    )
+
+@app.post("/admin/models/new")
+def admin_model_create(request: Request, csrf: str = Form(...), name: str = Form(...), make_id: int = Form(...), _=Depends(admin_session_required)):
+    require_csrf(request, csrf)
+    with DBSession(engine) as s:
+        m = Model(name=name, make_id=make_id)
+        s.add(m); s.commit()
+        audit(request.session.get("admin_user","admin"), "create", "models", m.id, None, {"name": name, "make_id": make_id}, get_ip(request))
+    flash(request, "Model created", "success")
+    return RedirectResponse("/admin/models", status_code=303)
+
+@app.get("/admin/models/{model_id}", response_class=HTMLResponse)
+def admin_model_edit(request: Request, model_id: int, _=Depends(admin_session_required)):
+    with DBSession(engine) as s:
+        item = s.get(Model, model_id)
+        makes = s.exec(select(Make).order_by(Make.name)).all()
+    return templates.TemplateResponse(
+        "admin_model_edit.html",
+        {"request": request, "item": item, "makes": makes, "action": f"/admin/models/{model_id}", "title": "Edit Model", "csrf": csrf_token(request), "flash": pop_flash(request)},
+    )
+
+@app.post("/admin/models/{model_id}")
+def admin_model_update(request: Request, model_id: int, csrf: str = Form(...), name: str = Form(...), make_id: int = Form(...), _=Depends(admin_session_required)):
+    require_csrf(request, csrf)
+    with DBSession(engine) as s:
+        item = s.get(Model, model_id)
+        before = item.__dict__.copy() if item else None
+        if item:
+            item.name = name
+            item.make_id = make_id
+            s.add(item); s.commit()
+            audit(request.session.get("admin_user","admin"), "update", "models", model_id, before, {"name": name, "make_id": make_id}, get_ip(request))
+    flash(request, "Model updated", "success")
+    return RedirectResponse("/admin/models", status_code=303)
+
+@app.get("/admin/models/{model_id}/delete")
+def admin_model_delete(request: Request, model_id: int, _=Depends(admin_session_required)):
+    with DBSession(engine) as s:
+        item = s.get(Model, model_id)
+        if item:
+            before = item.__dict__.copy()
+            s.delete(item); s.commit()
+            audit(request.session.get("admin_user","admin"), "delete", "models", model_id, before, None, get_ip(request))
+    flash(request, "Model deleted", "success")
+    return RedirectResponse("/admin/models", status_code=303)
+
 def allowed_sorts():
     return {"posted_at","id","price","year","mileage","make","model"}
 
@@ -193,7 +381,9 @@ def admin_cars(
     request: Request,
     page: int = 1, per: int = 25,
     q: Optional[str] = None,
-    make: Optional[str] = None,
+    make_id: Optional[int] = None,
+    model_id: Optional[int] = None,
+    category_id: Optional[int] = None,
     status: Optional[str] = None,
     year_min: Optional[int] = None,
     year_max: Optional[int] = None,
@@ -209,8 +399,12 @@ def admin_cars(
     if q:
         where.append("(vin LIKE :q OR make LIKE :q OR model LIKE :q OR title LIKE :q)")
         args["q"] = f"%{q}%"
-    if make:
-        where.append("make = :make"); args["make"] = make
+    if make_id is not None:
+        where.append("make_id = :make_id"); args["make_id"] = make_id
+    if model_id is not None:
+        where.append("model_id = :model_id"); args["model_id"] = model_id
+    if category_id is not None:
+        where.append("category_id = :category_id"); args["category_id"] = category_id
     if status:
         where.append("auction_status = :status"); args["status"] = status
     if year_min is not None:
@@ -220,14 +414,18 @@ def admin_cars(
     where_sql = " AND ".join(where)
 
     with DBSession(engine) as s:
+        makes = s.exec(select(Make).order_by(Make.name)).all()
+        models = s.exec(select(Model).order_by(Model.name)).all()
+        categories = s.exec(select(Category).order_by(Category.name)).all()
         total = s.exec(text(f"SELECT COUNT(*) AS c FROM cars WHERE {where_sql}").bindparams(**args)).first()[0]
         rows = s.exec(
             text(f"SELECT * FROM cars WHERE {where_sql} ORDER BY {sort_col} DESC LIMIT :per OFFSET :off").bindparams(**(dict(args, per=per, off=off)))).mappings().all()
     last_page = max(1, (total + per - 1)//per)
     t = csrf_token(request)
     resp = templates.TemplateResponse("admin_cars.html", {
-        "request": request, "cars": rows, "q": q or "", "make": make or "", "status": status or "",
+        "request": request, "cars": rows, "q": q or "", "make_id": make_id, "model_id": model_id, "category_id": category_id, "status": status or "",
         "year_min": year_min, "year_max": year_max, "sort": sort_col, "per": per,
+        "makes": makes, "models": models, "categories": categories,
         "page": page, "last_page": last_page, "total": total, "title":"Cars",
         "flash": pop_flash(request)
     })
@@ -236,6 +434,10 @@ def admin_cars(
 @app.get("/admin/cars/new", response_class=HTMLResponse)
 def admin_car_new(request: Request, _=Depends(admin_session_required)):
     t = csrf_token(request)
+    with DBSession(engine) as s:
+        makes = s.exec(select(Make).order_by(Make.name)).all()
+        models = s.exec(select(Model).order_by(Model.name)).all()
+        categories = s.exec(select(Category).order_by(Category.name)).all()
     resp = templates.TemplateResponse(
         "admin_car_edit.html",
         {
@@ -244,6 +446,9 @@ def admin_car_new(request: Request, _=Depends(admin_session_required)):
             "action": "/admin/cars/new",
             "title": "New Car",
             "csrf": csrf_token(request),
+            "makes": makes,
+            "models": models,
+            "categories": categories,
             "flash": pop_flash(request),
         },
     )
@@ -253,7 +458,7 @@ def admin_car_new(request: Request, _=Depends(admin_session_required)):
 def admin_car_create(
     request: Request,
     csrf: str = Form(...),
-    vin: str = Form(None), year: int = Form(None), make: str = Form(None), model: str = Form(None), trim: str = Form(None),
+    vin: str = Form(None), year: int = Form(None), make_id: int = Form(None), model_id: int = Form(None), category_id: int = Form(None), trim: str = Form(None),
     price: float = Form(None), mileage: int = Form(None), currency: str = Form("USD"),
     city: str = Form(None), state: str = Form(None),
     auction_status: str = Form(None), lot_number: str = Form(None), source: str = Form(None),
@@ -264,11 +469,14 @@ def admin_car_create(
 ):
     require_csrf(request, csrf)
     allowed = set(Car.model_fields.keys())
-    payload = {k:v for k,v in dict(vin=vin, year=year, make=make, model=model, trim=trim, price=price, mileage=mileage, currency=currency,
-                                   city=city, state=state, auction_status=auction_status, lot_number=lot_number, source=source,
-                                   url=url, title=title, image_url=image_url, description=description, seller_name=seller_name,
-                                   seller_rating=seller_rating, seller_reviews=seller_reviews, posted_at=posted_at).items() if k in allowed}
     with DBSession(engine) as s:
+        make_name = s.get(Make, make_id).name if make_id else None
+        model_name = s.get(Model, model_id).name if model_id else None
+        payload = {k:v for k,v in dict(vin=vin, year=year, make=make_name, make_id=make_id, model=model_name, model_id=model_id, category_id=category_id,
+                                       trim=trim, price=price, mileage=mileage, currency=currency,
+                                       city=city, state=state, auction_status=auction_status, lot_number=lot_number, source=source,
+                                       url=url, title=title, image_url=image_url, description=description, seller_name=seller_name,
+                                       seller_rating=seller_rating, seller_reviews=seller_reviews, posted_at=posted_at).items() if k in allowed}
         c = Car(**payload)
         s.add(c); s.commit()
         audit(request.session.get("admin_user","admin"), "create", "cars", c.id, None, payload, get_ip(request))
@@ -279,6 +487,9 @@ def admin_car_create(
 def admin_car_edit(request: Request, car_id: int, _=Depends(admin_session_required)):
     with DBSession(engine) as s:
         car = s.get(Car, car_id)
+        makes = s.exec(select(Make).order_by(Make.name)).all()
+        models = s.exec(select(Model).order_by(Model.name)).all()
+        categories = s.exec(select(Category).order_by(Category.name)).all()
     t = csrf_token(request)
     resp = templates.TemplateResponse(
         "admin_car_edit.html",
@@ -288,6 +499,9 @@ def admin_car_edit(request: Request, car_id: int, _=Depends(admin_session_requir
             "action": f"/admin/cars/{car_id}",
             "title": f"Edit Car {car_id}",
             "csrf": csrf_token(request),
+            "makes": makes,
+            "models": models,
+            "categories": categories,
             "flash": pop_flash(request),
         },
     )
@@ -297,7 +511,7 @@ def admin_car_edit(request: Request, car_id: int, _=Depends(admin_session_requir
 def admin_car_update(
     request: Request, car_id: int,
     csrf: str = Form(...),
-    vin: str = Form(None), year: int = Form(None), make: str = Form(None), model: str = Form(None), trim: str = Form(None),
+    vin: str = Form(None), year: int = Form(None), make_id: int = Form(None), model_id: int = Form(None), category_id: int = Form(None), trim: str = Form(None),
     price: float = Form(None), mileage: int = Form(None), currency: str = Form("USD"),
     city: str = Form(None), state: str = Form(None),
     auction_status: str = Form(None), lot_number: str = Form(None), source: str = Form(None),
@@ -308,11 +522,14 @@ def admin_car_update(
 ):
     require_csrf(request, csrf)
     allowed = set(Car.model_fields.keys())
-    payload = {k:v for k,v in dict(vin=vin, year=year, make=make, model=model, trim=trim, price=price, mileage=mileage, currency=currency,
-                                   city=city, state=state, auction_status=auction_status, lot_number=lot_number, source=source,
-                                   url=url, title=title, image_url=image_url, description=description, seller_name=seller_name,
-                                   seller_rating=seller_rating, seller_reviews=seller_reviews, posted_at=posted_at).items() if k in allowed}
     with DBSession(engine) as s:
+        make_name = s.get(Make, make_id).name if make_id else None
+        model_name = s.get(Model, model_id).name if model_id else None
+        payload = {k:v for k,v in dict(vin=vin, year=year, make=make_name, make_id=make_id, model=model_name, model_id=model_id, category_id=category_id,
+                                       trim=trim, price=price, mileage=mileage, currency=currency,
+                                       city=city, state=state, auction_status=auction_status, lot_number=lot_number, source=source,
+                                       url=url, title=title, image_url=image_url, description=description, seller_name=seller_name,
+                                       seller_rating=seller_rating, seller_reviews=seller_reviews, posted_at=posted_at).items() if k in allowed}
         car = s.get(Car, car_id)
         before = car.model_dump() if hasattr(car,"model_dump") else car.__dict__.copy()
         for k,v in payload.items(): setattr(car,k,v)

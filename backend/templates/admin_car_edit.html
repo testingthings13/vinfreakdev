@@ -6,8 +6,30 @@
   <div class="grid">
     <label>VIN <input name="vin" value="{{ car.vin if car else '' }}"></label>
     <label>Year <input type="number" name="year" value="{{ car.year if car else '' }}"></label>
-    <label>Make <input name="make" value="{{ car.make if car else '' }}"></label>
-    <label>Model <input name="model" value="{{ car.model if car else '' }}"></label>
+    <label>Make
+      <select name="make_id">
+        <option value=""></option>
+        {% for m in makes %}
+          <option value="{{ m.id }}" {{ 'selected' if car and car.make_id==m.id else '' }}>{{ m.name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Model
+      <select name="model_id">
+        <option value=""></option>
+        {% for m in models %}
+          <option value="{{ m.id }}" {{ 'selected' if car and car.model_id==m.id else '' }}>{{ m.name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Category
+      <select name="category_id">
+        <option value=""></option>
+        {% for c in categories %}
+          <option value="{{ c.id }}" {{ 'selected' if car and car.category_id==c.id else '' }}>{{ c.name }}</option>
+        {% endfor %}
+      </select>
+    </label>
     <label>Trim <input name="trim" value="{{ car.trim if car else '' }}"></label>
     <label>Price <input type="number" step="0.01" name="price" value="{{ car.price if car else '' }}"></label>
     <label>Mileage <input type="number" name="mileage" value="{{ car.mileage if car else '' }}"></label>

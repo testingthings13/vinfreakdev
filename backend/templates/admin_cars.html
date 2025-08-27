@@ -4,7 +4,24 @@
 
 <form class="filters" method="get" action="/admin/cars">
   <input type="text" name="q" value="{{ q or '' }}" placeholder="Search VIN, make, model, title…"/>
-  <input type="text" name="make" value="{{ make or '' }}" placeholder="Make"/>
+  <select name="make_id">
+    <option value="">All makes</option>
+    {% for m in makes %}
+      <option value="{{ m.id }}" {{ 'selected' if make_id==m.id else '' }}>{{ m.name }}</option>
+    {% endfor %}
+  </select>
+  <select name="model_id">
+    <option value="">All models</option>
+    {% for m in models %}
+      <option value="{{ m.id }}" {{ 'selected' if model_id==m.id else '' }}>{{ m.name }}</option>
+    {% endfor %}
+  </select>
+  <select name="category_id">
+    <option value="">All categories</option>
+    {% for c in categories %}
+      <option value="{{ c.id }}" {{ 'selected' if category_id==c.id else '' }}>{{ c.name }}</option>
+    {% endfor %}
+  </select>
   <select name="status">
     <option value="">Any status</option>
     {% for s in ['LIVE','SOLD','RESERVE_NOT_MET','ENDED','DRAFT'] %}
@@ -74,9 +91,9 @@
 </table>
 
 <div class="pager">
-  {% if page>1 %}<a href="?page={{ page-1 }}&per={{ per }}&q={{ q }}&make={{ make }}&status={{ status }}&year_min={{ year_min }}&year_max={{ year_max }}&sort={{ sort }}">« Prev</a>{% endif %}
+  {% if page>1 %}<a href="?page={{ page-1 }}&per={{ per }}&q={{ q }}&make_id={{ make_id }}&model_id={{ model_id }}&category_id={{ category_id }}&status={{ status }}&year_min={{ year_min }}&year_max={{ year_max }}&sort={{ sort }}">« Prev</a>{% endif %}
   <span>Page {{ page }} / {{ last_page }} ({{ total }} items)</span>
-  {% if page<last_page %}<a href="?page={{ page+1 }}&per={{ per }}&q={{ q }}&make={{ make }}&status={{ status }}&year_min={{ year_min }}&year_max={{ year_max }}&sort={{ sort }}">Next »</a>{% endif %}
+  {% if page<last_page %}<a href="?page={{ page+1 }}&per={{ per }}&q={{ q }}&make_id={{ make_id }}&model_id={{ model_id }}&category_id={{ category_id }}&status={{ status }}&year_min={{ year_min }}&year_max={{ year_max }}&sort={{ sort }}">Next »</a>{% endif %}
 </div>
 
 <script>

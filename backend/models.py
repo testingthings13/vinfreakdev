@@ -1,13 +1,36 @@
 from typing import Optional
 from sqlmodel import SQLModel, Field
 
+
+class Make(SQLModel, table=True):
+    __tablename__ = "makes"
+    id: int | None = Field(default=None, primary_key=True)
+    name: str
+
+
+class Model(SQLModel, table=True):
+    __tablename__ = "models"
+    id: int | None = Field(default=None, primary_key=True)
+    name: str
+    make_id: int | None = Field(default=None, foreign_key="makes.id")
+
+
+class Category(SQLModel, table=True):
+    __tablename__ = "categories"
+    id: int | None = Field(default=None, primary_key=True)
+    name: str
+
+
 # NOTE: Car columns mirror existing DB plus optional deleted_at for soft delete.
 class Car(SQLModel, table=True):
     __tablename__ = "cars"
     id: int | None = Field(default=None, primary_key=True)
     vin: str | None = None
     make: str | None = None
+    make_id: int | None = Field(default=None, foreign_key="makes.id")
     model: str | None = None
+    model_id: int | None = Field(default=None, foreign_key="models.id")
+    category_id: int | None = Field(default=None, foreign_key="categories.id")
     trim: str | None = None
     year: int | None = None
     mileage: int | None = None
