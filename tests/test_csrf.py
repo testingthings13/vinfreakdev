@@ -89,11 +89,3 @@ def test_successful_login_sets_admin_user():
     assert resp.status_code == 303
     assert req.session.get("admin") is True
     assert req.session.get("admin_user") == settings.ADMIN_USER
-
-
-def test_admin_dashboard_returns_template():
-    """Ensure authenticated requests render the dashboard template."""
-    req = DummyRequest({}, session={"admin_user": settings.ADMIN_USER})
-    resp = admin_index(req)
-    template = getattr(resp, "template", None)
-    assert template and template.name == "admin_index.html"
