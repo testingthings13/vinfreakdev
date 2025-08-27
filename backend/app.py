@@ -45,8 +45,9 @@ async def _force_admin(request, call_next):
 templates = Jinja2Templates(directory="templates")
 
 app.add_middleware(SessionMiddleware, secret_key=settings.SECRET_KEY)
+Path(settings.UPLOAD_DIR).mkdir(parents=True, exist_ok=True)
 app.mount("/static", StaticFiles(directory="static"), name="static")
-app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")
 
 # CORS (loose for dev)
 try:
@@ -63,7 +64,6 @@ except Exception:
 
 @app.on_event("startup")
 def on_start():
-    Path(settings.UPLOAD_DIR).mkdir(parents=True, exist_ok=True)
     init_db()
 
 # -------- helpers: auth/flash/csrf/audit ----------
