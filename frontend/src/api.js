@@ -1,6 +1,33 @@
 // Unified API helper that supports both array and {items,total,...} responses
 const BASE = (import.meta.env.VITE_API_BASE ?? window.location.origin).replace(/\/+$/, "");
 
+// Generic JSON fetch with timeout
+export async function getJSON(path, { timeoutMs = 12000 } = {}) {
+  const url = `${BASE}${path.startsWith("/") ? path : "/" + path}`;
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, {
+      headers: { Accept: "application/json" },
+      signal: ctrl.signal,
+    });
+    const text = await res.text();
+    if (!res.ok)
+      throw new Error(`${res.status} ${res.statusText} • ${text.slice(0, 200)}`);
+    try {
+      return JSON.parse(text);
+    } catch {
+      throw new Error(`Invalid JSON from ${url}: ${text.slice(0, 200)}`);
+    }
+  } catch (e) {
+    if (e.name === "AbortError")
+      throw new Error(`Request timed out after ${timeoutMs}ms: ${url}`);
+    throw e;
+  } finally {
+    clearTimeout(t);
+  }
+}
+
 // Map filters -> URLSearchParams
 function toParams(filters = {}, paging = {}) {
   const p = new URLSearchParams();

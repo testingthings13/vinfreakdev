@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { getJSON } from "../lib/api";
+import { getJSON } from "../api";
 import { normalizeCar } from "../utils/normalizeCar";
 import useDebounce from "../utils/useDebounce";
 import SearchBar from "../components/SearchBar";
