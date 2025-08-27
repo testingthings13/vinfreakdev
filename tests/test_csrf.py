@@ -51,11 +51,12 @@ templates_dir = ROOT / "templates"
 if templates_dir.exists():
     shutil.rmtree(templates_dir)
 templates_dir.mkdir()
-shutil.copy(ROOT / "backend" / "templates" / "admin_login.html", templates_dir / "admin_login.html")
+for tmpl in ["admin_login.html", "admin_index.html", "_base.html"]:
+    shutil.copy(ROOT / "backend" / "templates" / tmpl, templates_dir / tmpl)
 
 sys.path.append(str(ROOT))
 
-from backend.app import admin_login  # now import after stubs
+from backend.app import admin_login, admin_index  # now import after stubs
 
 
 class DummyRequest:

@@ -179,8 +179,11 @@ def public_settings():
 # -------- admin UI ----------
 @app.get("/admin", response_class=HTMLResponse)
 def admin_index(request: Request, _=Depends(admin_session_required)):
-    t = csrf_token(request)
-    resp = templates.TemplateResponse("admin_index.html", {"request": request, "title":"Dashboard", "flash": pop_flash(request)})
+    csrf_token(request)
+    return templates.TemplateResponse(
+        "admin_index.html",
+        {"request": request, "title": "Dashboard", "flash": pop_flash(request)},
+    )
 
 def allowed_sorts():
     return {"posted_at","id","price","year","mileage","make","model"}
