@@ -5,6 +5,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from typing import Optional, List
 from sqlmodel import Session as DBSession, select, select
 from sqlalchemy import text
@@ -12,13 +13,26 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from sqlalchemy import func
 
-def require_admin(*args, **kwargs):
-    # bypass admin check
+from backend_settings import settings
+security = HTTPBasic()
+
+def require_admin(
+    request: Request,
+    credentials: HTTPBasicCredentials = Depends(security),
+):
+    if request.session.get("admin_user"):
+        return True
+    username_ok = hmac.compare_digest(credentials.username or "", settings.ADMIN_USER)
+    password_ok = hmac.compare_digest(credentials.password or "", settings.ADMIN_PASS)
+    if not (username_ok and password_ok):
+        raise HTTPException(
+            status_code=401,
+            detail="Admin authentication required",
+            headers={"WWW-Authenticate": "Basic"},
+        )
     return True
 
 import io, csv, json, os, secrets, time
-
-from backend_settings import settings
 from db import engine, init_db
 from models import Car, Media, ImportJob, Setting, AdminAudit
 
@@ -26,7 +40,6 @@ app = FastAPI(title="Vinfreak Backend")
 
 @app.middleware("http")
 async def _force_admin(request, call_next):
-    request.session['admin'] = True
     return await call_next(request)
 
 templates = Jinja2Templates(directory="templates")
@@ -69,7 +82,7 @@ def get_ip(request: Request) -> str:
 
 def admin_session_required(request: Request):
     if not request.session.get("admin_user"):
-        pass  # bypassed 401
+        raise HTTPException(status_code=401)
     return True
 
 def csrf_token(request: Request):
@@ -463,7 +476,7 @@ async def admin_login_submit(request: Request,
 
 
 @app.get("/admin/seed")
-def _admin_seed(request):
+def _admin_seed(request: Request, _=Depends(admin_session_required)):
     """Insert a few demo cars if table is empty, then show a tiny report."""
     from starlette.responses import PlainTextResponse
     try:
