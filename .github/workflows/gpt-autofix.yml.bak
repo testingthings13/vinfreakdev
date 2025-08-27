@@ -24,7 +24,7 @@ jobs:
         run: npm ci || npm i
       - name: Frontend build (do not fail)
         env:
-          VITE_API_BASE: https://vinfreak.onrender.com
+          VITE_API_BASE: https://vinfreakdev.onrender.com
         working-directory: frontend
         run: npm run build || true
 
