@@ -32,7 +32,7 @@ def require_admin(
         )
     return True
 
-import io, csv, json, os, secrets, time
+import io, csv, json, os, secrets, time, shutil
 from db import engine, init_db
 from models import Car, Media, ImportJob, Setting, AdminAudit
 
@@ -179,8 +179,11 @@ def public_settings():
 # -------- admin UI ----------
 @app.get("/admin", response_class=HTMLResponse)
 def admin_index(request: Request, _=Depends(admin_session_required)):
-    t = csrf_token(request)
-    resp = templates.TemplateResponse("admin_index.html", {"request": request, "title":"Dashboard", "flash": pop_flash(request)})
+    csrf_token(request)
+    return templates.TemplateResponse(
+        "admin_index.html",
+        {"request": request, "title": "Dashboard", "flash": pop_flash(request)},
+    )
 
 def allowed_sorts():
     return {"posted_at","id","price","year","mileage","make","model"}
@@ -228,11 +231,13 @@ def admin_cars(
         "page": page, "last_page": last_page, "total": total, "title":"Cars",
         "flash": pop_flash(request)
     })
+    return resp
 
 @app.get("/admin/cars/new", response_class=HTMLResponse)
 def admin_car_new(request: Request, _=Depends(admin_session_required)):
     t = csrf_token(request)
     resp = templates.TemplateResponse("admin_car_edit.html", {"request": request, "car": None, "action": "/admin/cars/new", "title":"New Car", "csrf": csrf_token(request), "flash": pop_flash(request)})
+    return resp
 
 @app.post("/admin/cars/new")
 def admin_car_create(
@@ -266,6 +271,7 @@ def admin_car_edit(request: Request, car_id: int, _=Depends(admin_session_requir
         car = s.get(Car, car_id)
     t = csrf_token(request)
     resp = templates.TemplateResponse("admin_car_edit.html", {"request": request, "car": car, "action": f"/admin/cars/{car_id}", "title": f"Edit Car {car_id}", "csrf": csrf_token(request), "flash": pop_flash(request)})
+    return resp
 
 @app.post("/admin/cars/{car_id}")
 def admin_car_update(
@@ -378,6 +384,52 @@ async def admin_cars_import(request: Request, csrf: str = Form(...), file: Uploa
     flash(request, f"Import done: {inserted} inserted, {updated} updated", "success")
     return RedirectResponse("/admin/cars", status_code=303)
 
+# Media
+@app.get("/admin/media", response_class=HTMLResponse)
+def admin_media(request: Request, _=Depends(admin_session_required)):
+    with DBSession(engine) as s:
+        rows = s.exec(text("SELECT * FROM media ORDER BY uploaded_at DESC")).mappings().all()
+    resp = templates.TemplateResponse(
+        "admin_media.html", {"request": request, "items": rows, "title": "Media", "flash": pop_flash(request)}
+    )
+    return resp
+
+@app.post("/admin/media")
+async def admin_media_upload(request: Request, files: List[UploadFile] = File(...), _=Depends(admin_session_required)):
+    Path(settings.UPLOAD_DIR).mkdir(parents=True, exist_ok=True)
+    with DBSession(engine) as s:
+        for f in files:
+            dest = Path(settings.UPLOAD_DIR) / f.filename
+            with dest.open("wb") as out:
+                shutil.copyfileobj(f.file, out)
+            url = f"/uploads/{f.filename}"
+            s.exec(text("INSERT INTO media(filename,url) VALUES(:f,:u)").bindparams(f=f.filename, u=url))
+        s.commit()
+    flash(request, f"Uploaded {len(files)} file(s)", "success")
+    return RedirectResponse("/admin/media", status_code=303)
+
+# Imports
+@app.get("/admin/imports", response_class=HTMLResponse)
+def admin_imports(request: Request, _=Depends(admin_session_required)):
+    with DBSession(engine) as s:
+        jobs = s.exec(text("SELECT * FROM import_jobs ORDER BY created DESC")).mappings().all()
+    resp = templates.TemplateResponse(
+        "admin_imports.html", {"request": request, "jobs": jobs, "title": "Imports", "flash": pop_flash(request)}
+    )
+    return resp
+
+@app.post("/admin/imports/run")
+def admin_imports_run(request: Request, source: str = Form(...), _=Depends(admin_session_required)):
+    with DBSession(engine) as s:
+        s.exec(
+            text("INSERT INTO import_jobs(source,status,created) VALUES(:src,'queued',:created)").bindparams(
+                src=source, created=datetime.utcnow().isoformat()
+            )
+        )
+        s.commit()
+    flash(request, "Import queued", "success")
+    return RedirectResponse("/admin/imports", status_code=303)
+
 # Settings
 @app.get("/admin/settings", response_class=HTMLResponse)
 def admin_settings(request: Request, _=Depends(admin_session_required)):
@@ -386,6 +438,7 @@ def admin_settings(request: Request, _=Depends(admin_session_required)):
     data = {r["key"]: r["value"] for r in rows}
     t = csrf_token(request)
     resp = templates.TemplateResponse("admin_settings.html", {"request": request, "settings": data, "title":"Settings", "csrf": csrf_token(request), "flash": pop_flash(request)})
+    return resp
 
 @app.post("/admin/settings")
 async def admin_settings_save(request: Request, csrf: str = Form(...), site_title: str = Form("Vinfreak"), site_tagline: str = Form("Discover performance & provenance"), theme: str = Form("dark"), logo_url: str = Form(""), logo: UploadFile | None = File(None), _=Depends(admin_session_required)):
@@ -425,6 +478,7 @@ async def admin_login(request: Request):
     username = form.get("username", "")
     password = form.get("password", "")
     if username == settings.ADMIN_USER and password == settings.ADMIN_PASS:
+        request.session["admin_user"] = username
         request.session["admin"] = True
         request.session["csrf_token"] = token_urlsafe(32)  # rotate token
         return RedirectResponse(url="/admin", status_code=303)
