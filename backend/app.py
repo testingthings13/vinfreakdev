@@ -6,7 +6,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
-from typing import Optional, List
+from typing import Optional
 from sqlmodel import Session as DBSession, select
 from sqlalchemy import text
 from datetime import datetime, timedelta
@@ -34,7 +34,7 @@ def require_admin(
 
 import io, csv, json, os, secrets, time
 from db import engine, init_db
-from models import Car, Media, ImportJob, Setting, AdminAudit
+from models import Car, ImportJob, Setting, AdminAudit
 try:
     from models import Make, Model, Category
 except Exception:  # during tests models may be stubbed
@@ -188,190 +188,6 @@ def admin_index(request: Request, _=Depends(admin_session_required)):
         "admin_index.html",
         {"request": request, "title": "Dashboard", "flash": pop_flash(request)},
     )
-
-# ----- Taxonomy: Makes -----
-@app.get("/admin/makes", response_class=HTMLResponse)
-def admin_makes(request: Request, _=Depends(admin_session_required)):
-    with DBSession(engine) as s:
-        items = s.exec(select(Make).order_by(Make.name)).all()
-    return templates.TemplateResponse(
-        "admin_makes.html",
-        {"request": request, "items": items, "title": "Makes", "flash": pop_flash(request)},
-    )
-
-@app.get("/admin/makes/new", response_class=HTMLResponse)
-def admin_make_new(request: Request, _=Depends(admin_session_required)):
-    return templates.TemplateResponse(
-        "admin_make_edit.html",
-        {"request": request, "item": None, "action": "/admin/makes/new", "title": "New Make", "csrf": csrf_token(request), "flash": pop_flash(request)},
-    )
-
-@app.post("/admin/makes/new")
-def admin_make_create(request: Request, csrf: str = Form(...), name: str = Form(...), _=Depends(admin_session_required)):
-    require_csrf(request, csrf)
-    with DBSession(engine) as s:
-        m = Make(name=name)
-        s.add(m); s.commit()
-        audit(request.session.get("admin_user","admin"), "create", "makes", m.id, None, {"name": name}, get_ip(request))
-    flash(request, "Make created", "success")
-    return RedirectResponse("/admin/makes", status_code=303)
-
-@app.get("/admin/makes/{make_id}", response_class=HTMLResponse)
-def admin_make_edit(request: Request, make_id: int, _=Depends(admin_session_required)):
-    with DBSession(engine) as s:
-        item = s.get(Make, make_id)
-    return templates.TemplateResponse(
-        "admin_make_edit.html",
-        {"request": request, "item": item, "action": f"/admin/makes/{make_id}", "title": "Edit Make", "csrf": csrf_token(request), "flash": pop_flash(request)},
-    )
-
-@app.post("/admin/makes/{make_id}")
-def admin_make_update(request: Request, make_id: int, csrf: str = Form(...), name: str = Form(...), _=Depends(admin_session_required)):
-    require_csrf(request, csrf)
-    with DBSession(engine) as s:
-        item = s.get(Make, make_id)
-        before = item.__dict__.copy() if item else None
-        if item:
-            item.name = name
-            s.add(item); s.commit()
-            audit(request.session.get("admin_user","admin"), "update", "makes", make_id, before, {"name": name}, get_ip(request))
-    flash(request, "Make updated", "success")
-    return RedirectResponse("/admin/makes", status_code=303)
-
-@app.get("/admin/makes/{make_id}/delete")
-def admin_make_delete(request: Request, make_id: int, _=Depends(admin_session_required)):
-    with DBSession(engine) as s:
-        item = s.get(Make, make_id)
-        if item:
-            before = item.__dict__.copy()
-            s.delete(item); s.commit()
-            audit(request.session.get("admin_user","admin"), "delete", "makes", make_id, before, None, get_ip(request))
-    flash(request, "Make deleted", "success")
-    return RedirectResponse("/admin/makes", status_code=303)
-
-# ----- Taxonomy: Categories -----
-@app.get("/admin/categories", response_class=HTMLResponse)
-def admin_categories(request: Request, _=Depends(admin_session_required)):
-    with DBSession(engine) as s:
-        items = s.exec(select(Category).order_by(Category.name)).all()
-    return templates.TemplateResponse(
-        "admin_categories.html",
-        {"request": request, "items": items, "title": "Categories", "flash": pop_flash(request)},
-    )
-
-@app.get("/admin/categories/new", response_class=HTMLResponse)
-def admin_category_new(request: Request, _=Depends(admin_session_required)):
-    return templates.TemplateResponse(
-        "admin_category_edit.html",
-        {"request": request, "item": None, "action": "/admin/categories/new", "title": "New Category", "csrf": csrf_token(request), "flash": pop_flash(request)},
-    )
-
-@app.post("/admin/categories/new")
-def admin_category_create(request: Request, csrf: str = Form(...), name: str = Form(...), _=Depends(admin_session_required)):
-    require_csrf(request, csrf)
-    with DBSession(engine) as s:
-        c = Category(name=name)
-        s.add(c); s.commit()
-        audit(request.session.get("admin_user","admin"), "create", "categories", c.id, None, {"name": name}, get_ip(request))
-    flash(request, "Category created", "success")
-    return RedirectResponse("/admin/categories", status_code=303)
-
-@app.get("/admin/categories/{cat_id}", response_class=HTMLResponse)
-def admin_category_edit(request: Request, cat_id: int, _=Depends(admin_session_required)):
-    with DBSession(engine) as s:
-        item = s.get(Category, cat_id)
-    return templates.TemplateResponse(
-        "admin_category_edit.html",
-        {"request": request, "item": item, "action": f"/admin/categories/{cat_id}", "title": "Edit Category", "csrf": csrf_token(request), "flash": pop_flash(request)},
-    )
-
-@app.post("/admin/categories/{cat_id}")
-def admin_category_update(request: Request, cat_id: int, csrf: str = Form(...), name: str = Form(...), _=Depends(admin_session_required)):
-    require_csrf(request, csrf)
-    with DBSession(engine) as s:
-        item = s.get(Category, cat_id)
-        before = item.__dict__.copy() if item else None
-        if item:
-            item.name = name
-            s.add(item); s.commit()
-            audit(request.session.get("admin_user","admin"), "update", "categories", cat_id, before, {"name": name}, get_ip(request))
-    flash(request, "Category updated", "success")
-    return RedirectResponse("/admin/categories", status_code=303)
-
-@app.get("/admin/categories/{cat_id}/delete")
-def admin_category_delete(request: Request, cat_id: int, _=Depends(admin_session_required)):
-    with DBSession(engine) as s:
-        item = s.get(Category, cat_id)
-        if item:
-            before = item.__dict__.copy()
-            s.delete(item); s.commit()
-            audit(request.session.get("admin_user","admin"), "delete", "categories", cat_id, before, None, get_ip(request))
-    flash(request, "Category deleted", "success")
-    return RedirectResponse("/admin/categories", status_code=303)
-
-# ----- Taxonomy: Models -----
-@app.get("/admin/models", response_class=HTMLResponse)
-def admin_models(request: Request, _=Depends(admin_session_required)):
-    with DBSession(engine) as s:
-        rows = s.exec(text("SELECT models.id, models.name, models.make_id, makes.name AS make_name FROM models LEFT JOIN makes ON models.make_id = makes.id ORDER BY models.name")).mappings().all()
-    return templates.TemplateResponse(
-        "admin_models.html",
-        {"request": request, "items": rows, "title": "Models", "flash": pop_flash(request)},
-    )
-
-@app.get("/admin/models/new", response_class=HTMLResponse)
-def admin_model_new(request: Request, _=Depends(admin_session_required)):
-    with DBSession(engine) as s:
-        makes = s.exec(select(Make).order_by(Make.name)).all()
-    return templates.TemplateResponse(
-        "admin_model_edit.html",
-        {"request": request, "item": None, "makes": makes, "action": "/admin/models/new", "title": "New Model", "csrf": csrf_token(request), "flash": pop_flash(request)},
-    )
-
-@app.post("/admin/models/new")
-def admin_model_create(request: Request, csrf: str = Form(...), name: str = Form(...), make_id: int = Form(...), _=Depends(admin_session_required)):
-    require_csrf(request, csrf)
-    with DBSession(engine) as s:
-        m = Model(name=name, make_id=make_id)
-        s.add(m); s.commit()
-        audit(request.session.get("admin_user","admin"), "create", "models", m.id, None, {"name": name, "make_id": make_id}, get_ip(request))
-    flash(request, "Model created", "success")
-    return RedirectResponse("/admin/models", status_code=303)
-
-@app.get("/admin/models/{model_id}", response_class=HTMLResponse)
-def admin_model_edit(request: Request, model_id: int, _=Depends(admin_session_required)):
-    with DBSession(engine) as s:
-        item = s.get(Model, model_id)
-        makes = s.exec(select(Make).order_by(Make.name)).all()
-    return templates.TemplateResponse(
-        "admin_model_edit.html",
-        {"request": request, "item": item, "makes": makes, "action": f"/admin/models/{model_id}", "title": "Edit Model", "csrf": csrf_token(request), "flash": pop_flash(request)},
-    )
-
-@app.post("/admin/models/{model_id}")
-def admin_model_update(request: Request, model_id: int, csrf: str = Form(...), name: str = Form(...), make_id: int = Form(...), _=Depends(admin_session_required)):
-    require_csrf(request, csrf)
-    with DBSession(engine) as s:
-        item = s.get(Model, model_id)
-        before = item.__dict__.copy() if item else None
-        if item:
-            item.name = name
-            item.make_id = make_id
-            s.add(item); s.commit()
-            audit(request.session.get("admin_user","admin"), "update", "models", model_id, before, {"name": name, "make_id": make_id}, get_ip(request))
-    flash(request, "Model updated", "success")
-    return RedirectResponse("/admin/models", status_code=303)
-
-@app.get("/admin/models/{model_id}/delete")
-def admin_model_delete(request: Request, model_id: int, _=Depends(admin_session_required)):
-    with DBSession(engine) as s:
-        item = s.get(Model, model_id)
-        if item:
-            before = item.__dict__.copy()
-            s.delete(item); s.commit()
-            audit(request.session.get("admin_user","admin"), "delete", "models", model_id, before, None, get_ip(request))
-    flash(request, "Model deleted", "success")
-    return RedirectResponse("/admin/models", status_code=303)
 
 def allowed_sorts():
     return {"posted_at","id","price","year","mileage","make","model"}
@@ -633,46 +449,6 @@ async def admin_cars_import(request: Request, csrf: str = Form(...), file: Uploa
         s.commit()
     flash(request, f"Import done: {inserted} inserted, {updated} updated", "success")
     return RedirectResponse("/admin/cars", status_code=303)
-
-# Media
-@app.get("/admin/media", response_class=HTMLResponse)
-def admin_media(request: Request, _=Depends(admin_session_required)):
-    with DBSession(engine) as s:
-        items = s.exec(
-            text("SELECT id, filename, url, uploaded_at FROM media ORDER BY uploaded_at DESC")
-        ).mappings().all()
-    return templates.TemplateResponse(
-        "admin_media.html",
-        {
-            "request": request,
-            "items": items,
-            "title": "Media",
-            "csrf": csrf_token(request),
-            "flash": pop_flash(request),
-        },
-    )
-
-
-@app.post("/admin/media")
-async def admin_media_upload(
-    request: Request,
-    csrf: str = Form(...),
-    files: List[UploadFile] = File(...),
-    _=Depends(admin_session_required),
-):
-    require_csrf(request, csrf)
-    Path(settings.UPLOAD_DIR).mkdir(parents=True, exist_ok=True)
-    with DBSession(engine) as s:
-        for f in files:
-            dest = Path(settings.UPLOAD_DIR) / f.filename
-            with dest.open("wb") as out:
-                out.write(await f.read())
-            url = f"/uploads/{f.filename}"
-            s.add(Media(filename=f.filename, url=url, uploaded_at=datetime.utcnow().isoformat()))
-        s.commit()
-    flash(request, "Upload successful", "success")
-    return RedirectResponse("/admin/media", status_code=303)
-
 
 # Imports
 @app.get("/admin/imports", response_class=HTMLResponse)

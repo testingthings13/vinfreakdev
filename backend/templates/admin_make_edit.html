@@ -1,9 +1,0 @@
-{% extends "_base.html" %}
-{% block content %}
-<h1>{{ 'Edit' if item else 'New' }} Make</h1>
-<form class="form" method="post" action="{{ action }}">
-  <input type="hidden" name="csrf" value="{{ csrf }}">
-  <label>Name <input name="name" value="{{ item.name if item else '' }}"></label>
-  <button type="submit">Save</button>
-</form>
-{% endblock %}
