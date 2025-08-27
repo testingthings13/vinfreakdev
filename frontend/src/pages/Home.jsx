@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { getJSON } from "../lib/api";
+import { getJSON } from "../api";
 import { normalizeCar } from "../utils/normalizeCar";
 import { fmtNum, fmtMoney, fmtDate } from "../utils/text";
 import SearchBar from "../components/SearchBar";

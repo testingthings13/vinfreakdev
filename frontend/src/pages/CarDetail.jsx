@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
 import { useParams, Link } from "react-router-dom";
-import { getJSON } from "../lib/api";
+import { getJSON } from "../api";
 import Gallery from "../components/Gallery";
 import SourceLogo from "../components/SourceLogo";
 import { fmtMoney, fmtNum, fmtDate, toList } from "../utils/text";
