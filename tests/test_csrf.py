@@ -51,11 +51,12 @@ templates_dir = ROOT / "templates"
 if templates_dir.exists():
     shutil.rmtree(templates_dir)
 templates_dir.mkdir()
-shutil.copy(ROOT / "backend" / "templates" / "admin_login.html", templates_dir / "admin_login.html")
+for tmpl in ["admin_login.html", "admin_index.html", "_base.html"]:
+    shutil.copy(ROOT / "backend" / "templates" / tmpl, templates_dir / tmpl)
 
 sys.path.append(str(ROOT))
 
-from backend.app import admin_login  # now import after stubs
+from backend.app import admin_login, admin_index  # now import after stubs
 
 
 class DummyRequest:
@@ -75,3 +76,23 @@ def test_invalid_csrf_token_rejected():
     assert resp.status_code == 400
     assert resp.context["error"] == "CSRF token invalid"
     assert "admin" not in req.session
+    assert "admin_user" not in req.session
+
+
+def test_successful_login_sets_admin_user():
+    req = DummyRequest(
+        {"username": settings.ADMIN_USER, "password": settings.ADMIN_PASS, "csrf": "good"},
+        session={"csrf_token": "good"},
+    )
+    resp = asyncio.run(admin_login(req))
+    # Successful login should redirect
+    assert resp.status_code == 303
+    assert req.session.get("admin") is True
+    assert req.session.get("admin_user") == settings.ADMIN_USER
+
+
+def test_admin_dashboard_returns_template():
+    req = DummyRequest({}, session={"admin_user": settings.ADMIN_USER})
+    resp = admin_index(req)
+    template = getattr(resp, "template", None)
+    assert template and template.name == "admin_index.html"

@@ -179,8 +179,11 @@ def public_settings():
 # -------- admin UI ----------
 @app.get("/admin", response_class=HTMLResponse)
 def admin_index(request: Request, _=Depends(admin_session_required)):
-    t = csrf_token(request)
-    resp = templates.TemplateResponse("admin_index.html", {"request": request, "title":"Dashboard", "flash": pop_flash(request)})
+    csrf_token(request)
+    return templates.TemplateResponse(
+        "admin_index.html",
+        {"request": request, "title": "Dashboard", "flash": pop_flash(request)},
+    )
 
 def allowed_sorts():
     return {"posted_at","id","price","year","mileage","make","model"}
@@ -425,6 +428,7 @@ async def admin_login(request: Request):
     username = form.get("username", "")
     password = form.get("password", "")
     if username == settings.ADMIN_USER and password == settings.ADMIN_PASS:
+        request.session["admin_user"] = username
         request.session["admin"] = True
         request.session["csrf_token"] = token_urlsafe(32)  # rotate token
         return RedirectResponse(url="/admin", status_code=303)
