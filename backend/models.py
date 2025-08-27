@@ -47,6 +47,8 @@ class ImportJob(SQLModel, table=True):
     created_items: int | None = 0
     updated_items: int | None = 0
     errors: str | None = None
+    cancellable: bool | None = True
+    log: str | None = None
 
 class Setting(SQLModel, table=True):
     __tablename__ = "settings"
