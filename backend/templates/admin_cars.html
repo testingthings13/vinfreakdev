@@ -1,0 +1,86 @@
+{% extends "_base.html" %}
+{% block content %}
+<h1>Cars</h1>
+
+<form class="filters" method="get" action="/admin/cars">
+  <input type="text" name="q" value="{{ q or '' }}" placeholder="Search VIN, make, model, title…"/>
+  <input type="text" name="make" value="{{ make or '' }}" placeholder="Make"/>
+  <select name="status">
+    <option value="">Any status</option>
+    {% for s in ['LIVE','SOLD','RESERVE_NOT_MET','ENDED','DRAFT'] %}
+      <option value="{{ s }}" {{ 'selected' if status==s else '' }}>{{ s }}</option>
+    {% endfor %}
+  </select>
+  <input type="number" name="year_min" value="{{ year_min if year_min is not none else '' }}" placeholder="Year ≥">
+  <input type="number" name="year_max" value="{{ year_max if year_max is not none else '' }}" placeholder="Year ≤">
+  <select name="sort">
+    {% for s in ['posted_at','id','price','year','mileage','make','model'] %}
+    <option value="{{ s }}" {{ 'selected' if sort==s else '' }}>Sort: {{ s }}</option>
+    {% endfor %}
+  </select>
+  <select name="per">
+    {% for p in [25,50,100] %}
+    <option value="{{ p }}" {{ 'selected' if per==p else '' }}>{{ p }}/page</option>
+    {% endfor %}
+  </select>
+  <button type="submit">Apply</button>
+  <a class="button" href="/admin/cars/new">+ New Car</a>
+  <a class="button" href="/admin/cars/export?fmt=csv">Export CSV</a>
+  <a class="button" href="/admin/cars/export?fmt=json">Export JSON</a>
+</form>
+
+<form class="form" action="/admin/cars/import" method="post" enctype="multipart/form-data" style="margin-bottom:12px">
+  <input type="hidden" name="csrf" value="{{ csrf_token(request) }}">
+  <label>Import CSV <input type="file" name="file" required></label>
+  <button type="submit">Upload</button>
+</form>
+
+<form class="form bulk" action="/admin/cars/bulk" method="post">
+  <input type="hidden" name="csrf" value="{{ csrf_token(request) }}">
+  <input type="hidden" name="ids" id="bulk_ids" value="">
+  <select name="action">
+    <option value="delete">Soft Delete</option>
+    {% for s in ['LIVE','SOLD','RESERVE_NOT_MET','ENDED','DRAFT'] %}
+      <option value="{{ s }}">Set Status: {{ s }}</option>
+    {% endfor %}
+  </select>
+  <button type="submit">Apply to selected</button>
+</form>
+
+<table class="table">
+  <thead><tr>
+    <th><input type="checkbox" id="chk_all" onclick="toggleAll(this)"></th>
+    <th>Thumb</th><th>Title</th><th>VIN</th><th>Year</th><th>Price</th><th>Status</th><th>Source</th><th></th>
+  </tr></thead>
+  <tbody>
+  {% for c in cars %}
+    <tr>
+      <td><input type="checkbox" class="rowchk" value="{{ c.id }}" onchange="collectBulk()"></td>
+      <td>{% if c.image_url %}<img src="{{ c.image_url.startswith('http') and c.image_url or '/uploads/' ~ c.image_url.lstrip('/') }}" alt="" style="height:36px;width:60px;object-fit:cover;border-radius:6px">{% endif %}</td>
+      <td>
+        {% if c.url %}<a href="{{ c.url }}" target="_blank">{% endif %}
+        {{ c.title or (c.year ~ ' ' ~ (c.make or '') ~ ' ' ~ (c.model or '')) }}
+        {% if c.url %}</a>{% endif %}
+      </td>
+      <td>{{ c.vin or '' }}</td>
+      <td>{{ c.year or '' }}</td>
+      <td>{{ (("{:,.0f}".format(c.price)) if c.price else "") ~ " " ~ (c.currency or "") }}</td>
+      <td>{{ c.auction_status or '' }}</td>
+      <td>{{ c.source or '' }}</td>
+      <td><a href="/admin/cars/{{ c.id }}">Edit</a> | <a href="/admin/cars/{{ c.id }}/delete" onclick="return confirm('Delete?')">Delete</a></td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+<div class="pager">
+  {% if page>1 %}<a href="?page={{ page-1 }}&per={{ per }}&q={{ q }}&make={{ make }}&status={{ status }}&year_min={{ year_min }}&year_max={{ year_max }}&sort={{ sort }}">« Prev</a>{% endif %}
+  <span>Page {{ page }} / {{ last_page }} ({{ total }} items)</span>
+  {% if page<last_page %}<a href="?page={{ page+1 }}&per={{ per }}&q={{ q }}&make={{ make }}&status={{ status }}&year_min={{ year_min }}&year_max={{ year_max }}&sort={{ sort }}">Next »</a>{% endif %}
+</div>
+
+<script>
+function toggleAll(el){ document.querySelectorAll('.rowchk').forEach(c=> c.checked=el.checked); collectBulk(); }
+function collectBulk(){ const ids=[...document.querySelectorAll('.rowchk:checked')].map(e=>e.value); document.getElementById('bulk_ids').value=ids.join(','); }
+</script>
+{% endblock %}

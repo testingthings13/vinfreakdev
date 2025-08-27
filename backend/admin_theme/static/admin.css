@@ -1,0 +1,45 @@
+:root {
+  --bg: #0b0f14;
+  --panel: #121823;
+  --muted: #9fb0c0;
+  --text: #e8eef6;
+  --accent: #58a6ff;
+  --accent-2: #00d4ff;
+  --danger: #ff6b6b;
+  --success: #2ecc71;
+}
+html, body {
+  background: radial-gradient(1500px 700px at 20% 10%, #0f1724 0%, #0b0f14 45%, #080b10 100%) fixed;
+  color: var(--text);
+}
+a, .btn-primary { color: var(--text); }
+a:hover { color: var(--accent); }
+.navbar, .sidebar, .content, .card, .table, .modal-content {
+  background-color: var(--panel) !important;
+  color: var(--text) !important;
+  border-color: #1e293b !important;
+}
+.btn, .form-control, .form-select {
+  background: #0f1520 !important;
+  color: var(--text) !important;
+  border: 1px solid #1e293b !important;
+}
+.badge.source {
+  display: inline-block; padding: 2px 8px; border-radius: 10px;
+  background: #0f1520; border: 1px solid #243247; font-size: 12px;
+}
+.badge.source.carsandbids { border-color: var(--accent); color: var(--accent); }
+.badge.source.bringatrailer { border-color: #ff8a00; color: #ffb366; }
+.badge.source.carscom { border-color: #7ee787; color: #a7f3d0; }
+.badge.source.unknown { border-color: #94a3b8; color: #cbd5e1; }
+.kpi-grid {
+  display: grid; grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); gap: 16px; margin: 16px 0;
+}
+.kpi {
+  background: linear-gradient(135deg, rgba(88,166,255,0.12), rgba(0,212,255,0.10));
+  border: 1px solid #203149; border-radius: 16px; padding: 16px;
+}
+.kpi-label { color: var(--muted); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; }
+.kpi-value { font-size: 28px; font-weight: 700; color: var(--text); }
+.table thead th { color: var(--muted); text-transform: uppercase; font-size: 12px; }
+.table td a { color: var(--accent-2); }

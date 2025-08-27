@@ -1,0 +1,15 @@
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+SQLAlchemy==2.0.35
+pydantic==2.8.2
+python-multipart==0.0.9
+itsdangerous==2.2.0
+WTForms==3.1.2
+
+Babel==2.15.0
+
+Jinja2==3.1.4
+
+MarkupSafe==2.1.5
+
+sqladmin

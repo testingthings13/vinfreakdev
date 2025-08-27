@@ -1,0 +1,29 @@
+{% extends "_base.html" %}
+{% block content %}
+<h1>Import Jobs</h1>
+<form class="form" method="post" action="/admin/imports/run">
+  <label>Source
+    <input name="source" placeholder="carsandbids / json / csv">
+  </label>
+  <button type="submit">Queue Import</button>
+</form>
+
+<table class="table">
+  <thead><tr>
+    <th>ID</th><th>Source</th><th>Status</th><th>Items</th><th>Started</th><th>Finished</th><th>Errors</th>
+  </tr></thead>
+  <tbody>
+  {% for j in jobs %}
+    <tr>
+      <td>{{ j.id }}</td>
+      <td>{{ j.source }}</td>
+      <td>{{ j.status }}</td>
+      <td>{{ j.created_items }}/{{ j.total_items }}</td>
+      <td>{{ j.started_at }}</td>
+      <td>{{ j.finished_at }}</td>
+      <td>{{ (j.errors[:80] ~ '…') if j.errors and j.errors|length>80 else (j.errors or '') }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

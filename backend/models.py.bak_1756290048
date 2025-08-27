@@ -1,0 +1,48 @@
+from typing import Optional
+from sqlmodel import SQLModel, Field
+from datetime import datetime
+
+class Media(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    filename: str
+    url: str
+    uploaded_at: datetime = Field(default_factory=datetime.utcnow)
+
+class Car(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    vin: Optional[str] = Field(default=None, index=True)
+    year: Optional[int] = None
+    make: Optional[str] = None
+    model: Optional[str] = None
+    trim: Optional[str] = None
+    price: Optional[float] = None
+    mileage: Optional[int] = None
+    currency: Optional[str] = "USD"
+    city: Optional[str] = None
+    state: Optional[str] = None
+    location: Optional[str] = None
+    auction_status: Optional[str] = None
+    lot_number: Optional[str] = None
+    source: Optional[str] = None
+    url: Optional[str] = None
+    title: Optional[str] = None
+    description: Optional[str] = None
+    main_image_url: Optional[str] = None
+    posted_at: Optional[datetime] = None
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+class ImportJob(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    source: str
+    status: str = "queued"   # queued, running, done, failed
+    started_at: Optional[datetime] = None
+    finished_at: Optional[datetime] = None
+    created: datetime = Field(default_factory=datetime.utcnow)
+    total_items: int = 0
+    created_items: int = 0
+    updated_items: int = 0
+    errors: Optional[str] = None
+
+class Setting(SQLModel, table=True):
+    key: str = Field(primary_key=True)
+    value: Optional[str] = None

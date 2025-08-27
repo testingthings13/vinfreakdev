@@ -1,0 +1,43 @@
+<!doctype html>
+<html data-theme="{{ (settings.get('theme') if settings else '') or 'dark' }}">
+<head>
+  <meta charset="utf-8"/>
+  <title>{{ title or "Admin" }}</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <link href="/static/admin.css" rel="stylesheet"/>
+  <script>
+  // keyboard shortcuts: s=submit, /=focus search
+  document.addEventListener('keydown', (e)=>{
+    const tag = (e.target && e.target.tagName || '').toLowerCase();
+    if (tag === 'input' || tag === 'textarea') return;
+    if (e.key === '/') { const s = document.querySelector('input[name="q"]'); if (s){ e.preventDefault(); s.focus(); } }
+  });
+  </script>
+</head>
+<body>
+  <header class="topbar sticky">
+    <div class="brand">
+      <a href="/admin">Vinfreak Admin</a>
+    </div>
+    <nav>
+      <a href="/admin/settings">Settings</a>
+      <a href="/admin/cars">Cars</a>
+      <a href="/admin/media">Media</a>
+      <a href="/admin/imports">Imports</a>
+      <a href="/admin/logout">Logout</a>
+    </nav>
+  </header>
+
+  {% if flash and flash|length %}
+    <div class="flash-wrap">
+      {% for f in flash %}
+        <div class="flash {{ f.cat }}">{{ f.msg }}</div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <main class="page">
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

@@ -1,0 +1,22 @@
+{% extends "_base.html" %}
+{% block content %}
+<h1>Media Library</h1>
+<form class="form" action="/admin/media" method="post" enctype="multipart/form-data">
+  <label>Upload image(s)
+    <input type="file" name="files" multiple>
+  </label>
+  <button type="submit">Upload</button>
+</form>
+
+<div class="media-grid">
+  {% for m in items %}
+    <div class="media-card">
+      <img src="{{ m.url }}" alt="{{ m.filename }}"/>
+      <div class="meta">
+        <div class="name">{{ m.filename }}</div>
+        <input class="url" value="{{ m.url }}" onclick="this.select();" readonly>
+      </div>
+    </div>
+  {% endfor %}
+</div>
+{% endblock %}

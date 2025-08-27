@@ -1,0 +1,29 @@
+{% extends "_base.html" %}
+{% block content %}
+<h1>Settings</h1>
+<form class="form" action="/admin/settings" method="post" enctype="multipart/form-data">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <label>Site Title
+    <input type="text" name="site_title" value="{{ settings.get('site_title','') }}">
+  </label>
+  <label>Tagline
+    <input type="text" name="site_tagline" value="{{ settings.get('site_tagline','') }}">
+  </label>
+  <label>Theme
+    <select name="theme">
+      <option value="dark" {{ 'selected' if settings.get('theme')=='dark' else '' }}>Dark</option>
+      <option value="light" {{ 'selected' if settings.get('theme')=='light' else '' }}>Light</option>
+    </select>
+  </label>
+  <div class="logo-row">
+    <div>
+      <label>Upload Logo <input type="file" name="logo"></label>
+    </div>
+    <div>
+      <label>Current Logo URL <input type="text" name="logo_url" value="{{ settings.get('logo_url','') }}"></label>
+      {% if settings.get('logo_url') %}<div class="preview"><img src="{{ settings.get('logo_url') }}" alt="logo"></div>{% endif %}
+    </div>
+  </div>
+  <button type="submit">Save</button>
+</form>
+{% endblock %}
