@@ -1,0 +1,20 @@
+{% extends "_base.html" %}
+{% block content %}
+<h1>Import Job {{ job.id }}</h1>
+<ul>
+  <li><strong>Source:</strong> {{ job.source }}</li>
+  <li><strong>Status:</strong> {{ job.status }}</li>
+  <li><strong>Items:</strong> {{ job.created_items }}/{{ job.total_items }}</li>
+  <li><strong>Started:</strong> {{ job.started_at }}</li>
+  <li><strong>Finished:</strong> {{ job.finished_at }}</li>
+  {% if job.log %}
+  <li><strong>Log:</strong><pre>{{ job.log }}</pre></li>
+  {% endif %}
+</ul>
+{% if job.status in ['queued','running'] and (job.cancellable is not defined or job.cancellable) %}
+<form method="post" action="/admin/imports/{{ job.id }}/cancel">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <button type="submit">Cancel</button>
+</form>
+{% endif %}
+{% endblock %}

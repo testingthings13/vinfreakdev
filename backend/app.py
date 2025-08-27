@@ -480,6 +480,48 @@ def admin_imports_run(
     flash(request, "Import queued", "success")
     return RedirectResponse("/admin/imports", status_code=303)
 
+
+@app.get("/admin/imports/{id}", response_class=HTMLResponse)
+def admin_import_detail(request: Request, id: int, _=Depends(admin_session_required)):
+    with DBSession(engine) as s:
+        job = s.get(ImportJob, id)
+    if not job:
+        raise HTTPException(status_code=404)
+    return templates.TemplateResponse(
+        "admin_import_detail.html",
+        {
+            "request": request,
+            "job": job,
+            "title": f"Import {id}",
+            "csrf": csrf_token(request),
+            "flash": pop_flash(request),
+        },
+    )
+
+
+@app.post("/admin/imports/{id}/cancel")
+def admin_import_cancel(
+    request: Request,
+    id: int,
+    csrf: str = Form(...),
+    _=Depends(admin_session_required),
+):
+    require_csrf(request, csrf)
+    with DBSession(engine) as s:
+        job = s.get(ImportJob, id)
+        if not job:
+            raise HTTPException(status_code=404)
+        if job.status not in ("queued", "running") or job.cancellable is False:
+            flash(request, "Job cannot be cancelled", "error")
+        else:
+            job.status = "cancelled"
+            job.finished_at = datetime.utcnow().isoformat()
+            job.cancellable = False
+            s.add(job)
+            s.commit()
+            flash(request, "Job cancelled", "success")
+    return RedirectResponse(f"/admin/imports/{id}", status_code=303)
+
 # Settings
 @app.get("/admin/settings", response_class=HTMLResponse)
 def admin_settings(request: Request, _=Depends(admin_session_required)):

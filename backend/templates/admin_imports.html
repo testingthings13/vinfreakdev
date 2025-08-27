@@ -10,18 +10,27 @@
 
 <table class="table">
   <thead><tr>
-    <th>ID</th><th>Source</th><th>Status</th><th>Items</th><th>Started</th><th>Finished</th><th>Errors</th>
+    <th>ID</th><th>Source</th><th>Status</th><th>Items</th><th>Started</th><th>Finished</th><th>Errors</th><th>Actions</th>
   </tr></thead>
   <tbody>
   {% for j in jobs %}
     <tr>
-      <td>{{ j.id }}</td>
+      <td><a href="/admin/imports/{{ j.id }}">{{ j.id }}</a></td>
       <td>{{ j.source }}</td>
       <td>{{ j.status }}</td>
       <td>{{ j.created_items }}/{{ j.total_items }}</td>
       <td>{{ j.started_at }}</td>
       <td>{{ j.finished_at }}</td>
       <td>{{ (j.errors[:80] ~ '…') if j.errors and j.errors|length>80 else (j.errors or '') }}</td>
+      <td>
+        <a href="/admin/imports/{{ j.id }}">View</a>
+        {% if j.status in ['queued','running'] and (j.cancellable is not defined or j.cancellable) %}
+        <form method="post" action="/admin/imports/{{ j.id }}/cancel" style="display:inline">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <button type="submit">Cancel</button>
+        </form>
+        {% endif %}
+      </td>
     </tr>
   {% endfor %}
   </tbody>
