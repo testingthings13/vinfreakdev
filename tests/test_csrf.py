@@ -26,7 +26,7 @@ class DummySession:
     def exec(self, *a, **kw):
         class R:
             def all(self): return []
-            def first(self): return None
+            def first(self): return (0,)
             def one(self): return 0
             def mappings(self): return self
         return R()
@@ -51,12 +51,12 @@ templates_dir = ROOT / "templates"
 if templates_dir.exists():
     shutil.rmtree(templates_dir)
 templates_dir.mkdir()
-for tmpl in ["admin_login.html", "admin_index.html", "_base.html"]:
+
     shutil.copy(ROOT / "backend" / "templates" / tmpl, templates_dir / tmpl)
 
 sys.path.append(str(ROOT))
 
-from backend.app import admin_login, admin_index  # now import after stubs
+
 
 
 class DummyRequest:
@@ -89,3 +89,4 @@ def test_successful_login_sets_admin_user():
     assert resp.status_code == 303
     assert req.session.get("admin") is True
     assert req.session.get("admin_user") == settings.ADMIN_USER
+
