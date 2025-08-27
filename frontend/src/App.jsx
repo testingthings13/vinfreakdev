@@ -10,6 +10,9 @@ export const SettingsContext = createContext({
   site_tagline: "Discover performance & provenance",
   logo_url: "",
   theme: "dark",
+  contact_email: "",
+  default_page_size: 12,
+  maintenance_banner: "",
 });
 
 export default function App() {
@@ -18,6 +21,9 @@ export default function App() {
     site_tagline: "Discover performance & provenance",
     logo_url: "",
     theme: "dark",
+    contact_email: "",
+    default_page_size: 12,
+    maintenance_banner: "",
   });
 
   useEffect(() => {
@@ -37,6 +43,9 @@ export default function App() {
   return (
     <SettingsContext.Provider value={settings}>
       <div className="app">
+        {settings.maintenance_banner && (
+          <div className="banner">{settings.maintenance_banner}</div>
+        )}
         <header className="app-header">
           <Link to="/" className="logo">
             {settings.logo_url ? (
@@ -57,6 +66,11 @@ export default function App() {
             </Routes>
           </ErrorBoundary>
         </main>
+        {settings.contact_email && (
+          <footer className="app-footer">
+            <a href={`mailto:${settings.contact_email}`}>{settings.contact_email}</a>
+          </footer>
+        )}
       </div>
     </SettingsContext.Provider>
   );

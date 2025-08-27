@@ -500,7 +500,19 @@ def admin_settings(request: Request, _=Depends(admin_session_required)):
     return resp
 
 @app.post("/admin/settings")
-async def admin_settings_save(request: Request, csrf: str = Form(...), site_title: str = Form("Vinfreak"), site_tagline: str = Form("Discover performance & provenance"), theme: str = Form("dark"), logo_url: str = Form(""), logo: UploadFile | None = File(None), _=Depends(admin_session_required)):
+async def admin_settings_save(
+    request: Request,
+    csrf: str = Form(...),
+    site_title: str = Form("Vinfreak"),
+    site_tagline: str = Form("Discover performance & provenance"),
+    theme: str = Form("dark"),
+    logo_url: str = Form(""),
+    contact_email: str = Form(""),
+    default_page_size: str = Form("12"),
+    maintenance_banner: str = Form(""),
+    logo: UploadFile | None = File(None),
+    _=Depends(admin_session_required),
+):
     require_csrf(request, csrf)
     if logo and logo.filename:
         dest = Path("uploads") / logo.filename
@@ -510,11 +522,37 @@ async def admin_settings_save(request: Request, csrf: str = Form(...), site_titl
     before = None
     with DBSession(engine) as s:
         # simple upserts
-        for k,v in {"site_title":site_title, "site_tagline":site_tagline, "theme":theme, "logo_url":logo_url}.items():
-            s.exec(text("INSERT INTO settings(key,value) VALUES(:k,:v) ON CONFLICT(key) DO UPDATE SET value=:v").bindparams(k=k, v=v))
+        for k, v in {
+            "site_title": site_title,
+            "site_tagline": site_tagline,
+            "theme": theme,
+            "logo_url": logo_url,
+            "contact_email": contact_email,
+            "default_page_size": default_page_size,
+            "maintenance_banner": maintenance_banner,
+        }.items():
+            s.exec(
+                text(
+                    "INSERT INTO settings(key,value) VALUES(:k,:v) ON CONFLICT(key) DO UPDATE SET value=:v"
+                ).bindparams(k=k, v=v)
+            )
         s.commit()
     flash(request, "Settings saved", "success")
-    audit(request.session.get("admin_user","admin"), "settings", "settings", "-", before, {"theme":theme,"logo_url":logo_url}, get_ip(request))
+    audit(
+        request.session.get("admin_user", "admin"),
+        "settings",
+        "settings",
+        "-",
+        before,
+        {
+            "theme": theme,
+            "logo_url": logo_url,
+            "contact_email": contact_email,
+            "default_page_size": default_page_size,
+            "maintenance_banner": maintenance_banner,
+        },
+        get_ip(request),
+    )
     return RedirectResponse("/admin/settings", status_code=303)
 
 

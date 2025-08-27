@@ -53,6 +53,15 @@ class Setting(SQLModel, table=True):
     key: str | None = Field(default=None, primary_key=True)
     value: str | None = None
 
+    # Known keys
+    SITE_TITLE = "site_title"
+    SITE_TAGLINE = "site_tagline"
+    THEME = "theme"
+    LOGO_URL = "logo_url"
+    CONTACT_EMAIL = "contact_email"
+    DEFAULT_PAGE_SIZE = "default_page_size"
+    MAINTENANCE_BANNER = "maintenance_banner"
+
 class AdminAudit(SQLModel, table=True):
     __tablename__ = "admin_audit"
     id: int | None = Field(default=None, primary_key=True)
