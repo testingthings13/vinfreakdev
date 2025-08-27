@@ -1,13 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-
-const useDebounced = (value, delay=400) => {
-  const [v, setV] = useState(value);
-  useEffect(() => {
-    const t = setTimeout(() => setV(value), delay);
-    return () => clearTimeout(t);
-  }, [value, delay]);
-  return v;
-};
+import { useEffect, useState } from "react";
+import useDebounce from "../utils/useDebounce.js";
 
 export default function FilterBar({ initial = {}, onChange }) {
   const [q, setQ] = useState(initial.q || "");
@@ -21,10 +13,10 @@ export default function FilterBar({ initial = {}, onChange }) {
   const [source, setSource] = useState(initial.source || "");
   const [sort, setSort] = useState(initial.sort || "relevance");
 
-  const dq = useDebounced(q);
-  const dvin = useDebounced(vin);
-  const dmake = useDebounced(make);
-  const dmodel = useDebounced(model);
+  const dq = useDebounce(q);
+  const dvin = useDebounce(vin);
+  const dmake = useDebounce(make);
+  const dmodel = useDebounce(model);
 
   useEffect(() => {
     onChange({
