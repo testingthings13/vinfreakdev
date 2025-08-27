@@ -75,3 +75,16 @@ def test_invalid_csrf_token_rejected():
     assert resp.status_code == 400
     assert resp.context["error"] == "CSRF token invalid"
     assert "admin" not in req.session
+    assert "admin_user" not in req.session
+
+
+def test_successful_login_sets_admin_user():
+    req = DummyRequest(
+        {"username": settings.ADMIN_USER, "password": settings.ADMIN_PASS, "csrf": "good"},
+        session={"csrf_token": "good"},
+    )
+    resp = asyncio.run(admin_login(req))
+    # Successful login should redirect
+    assert resp.status_code == 303
+    assert req.session.get("admin") is True
+    assert req.session.get("admin_user") == settings.ADMIN_USER
