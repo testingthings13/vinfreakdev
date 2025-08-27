@@ -16,6 +16,7 @@ settings = types.SimpleNamespace(
 )
 sys.modules['backend_settings'] = types.SimpleNamespace(settings=settings)
 
+
 class DummySession:
     def __init__(self, *args, **kwargs):
         pass
@@ -51,12 +52,11 @@ templates_dir = ROOT / "templates"
 if templates_dir.exists():
     shutil.rmtree(templates_dir)
 templates_dir.mkdir()
-
+for tmpl in ["admin_login.html"]:
     shutil.copy(ROOT / "backend" / "templates" / tmpl, templates_dir / tmpl)
 
 sys.path.append(str(ROOT))
-
-
+from backend.app import admin_login
 
 
 class DummyRequest:
@@ -89,4 +89,3 @@ def test_successful_login_sets_admin_user():
     assert resp.status_code == 303
     assert req.session.get("admin") is True
     assert req.session.get("admin_user") == settings.ADMIN_USER
-
