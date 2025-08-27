@@ -105,7 +105,16 @@ def require_csrf(request: Request, token: str):
 
 def audit(actor: str, action: str, table: str, row_id: str, before: dict|None, after: dict|None, ip: str):
     with DBSession(engine) as s:
-        s.exec(text('SELECT 1'))
+        s.add(AdminAudit(
+            actor=actor,
+            action=action,
+            table_name=table,
+            row_id=str(row_id),
+            before_json=json.dumps(before, ensure_ascii=False) if before else None,
+            after_json=json.dumps(after, ensure_ascii=False) if after else None,
+            ip=ip,
+            created_at=datetime.utcnow().isoformat(),
+        ))
         s.commit()
 
 # --------- Auth views ----------
