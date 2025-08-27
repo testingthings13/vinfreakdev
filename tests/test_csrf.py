@@ -92,6 +92,7 @@ def test_successful_login_sets_admin_user():
 
 
 def test_admin_dashboard_returns_template():
+    """Ensure authenticated requests render the dashboard template."""
     req = DummyRequest({}, session={"admin_user": settings.ADMIN_USER})
     resp = admin_index(req)
     template = getattr(resp, "template", None)
