@@ -376,20 +376,33 @@ def admin_model_delete(request: Request, model_id: int, _=Depends(admin_session_
 def allowed_sorts():
     return {"posted_at","id","price","year","mileage","make","model"}
 
+
+def _maybe_int(val: Optional[str]) -> Optional[int]:
+    try:
+        return int(val) if val not in (None, "") else None
+    except ValueError:
+        return None
+
 @app.get("/admin/cars", response_class=HTMLResponse)
 def admin_cars(
     request: Request,
     page: int = 1, per: int = 25,
     q: Optional[str] = None,
-    make_id: Optional[int] = None,
-    model_id: Optional[int] = None,
-    category_id: Optional[int] = None,
+    make_id: Optional[str] = None,
+    model_id: Optional[str] = None,
+    category_id: Optional[str] = None,
     status: Optional[str] = None,
-    year_min: Optional[int] = None,
-    year_max: Optional[int] = None,
+    year_min: Optional[str] = None,
+    year_max: Optional[str] = None,
     sort: str = "posted_at",
     _=Depends(admin_session_required),
 ):
+    make_id = _maybe_int(make_id)
+    model_id = _maybe_int(model_id)
+    category_id = _maybe_int(category_id)
+    year_min = _maybe_int(year_min)
+    year_max = _maybe_int(year_max)
+
     per = max(1, min(per, 100))
     off = (max(1,page)-1)*per
     sort_col = sort if sort in allowed_sorts() else "posted_at"
