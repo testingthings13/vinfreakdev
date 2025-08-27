@@ -1,0 +1,16 @@
+{% extends "_base.html" %}
+{% block content %}
+<h1>{{ 'Edit' if item else 'New' }} Model</h1>
+<form class="form" method="post" action="{{ action }}">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <label>Make
+    <select name="make_id">
+      {% for mk in makes %}
+        <option value="{{ mk.id }}" {{ 'selected' if item and item.make_id==mk.id else '' }}>{{ mk.name }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>Name <input name="name" value="{{ item.name if item else '' }}"></label>
+  <button type="submit">Save</button>
+</form>
+{% endblock %}
