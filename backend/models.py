@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import ClassVar
 from sqlmodel import SQLModel, Field
 
 
@@ -79,13 +79,13 @@ class Setting(SQLModel, table=True):
     value: str | None = None
 
     # Known keys
-    SITE_TITLE = "site_title"
-    SITE_TAGLINE = "site_tagline"
-    THEME = "theme"
-    LOGO_URL = "logo_url"
-    CONTACT_EMAIL = "contact_email"
-    DEFAULT_PAGE_SIZE = "default_page_size"
-    MAINTENANCE_BANNER = "maintenance_banner"
+    SITE_TITLE: ClassVar[str] = "site_title"
+    SITE_TAGLINE: ClassVar[str] = "site_tagline"
+    THEME: ClassVar[str] = "theme"
+    LOGO_URL: ClassVar[str] = "logo_url"
+    CONTACT_EMAIL: ClassVar[str] = "contact_email"
+    DEFAULT_PAGE_SIZE: ClassVar[str] = "default_page_size"
+    MAINTENANCE_BANNER: ClassVar[str] = "maintenance_banner"
 
 class AdminAudit(SQLModel, table=True):
     __tablename__ = "admin_audit"
