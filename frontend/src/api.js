@@ -28,6 +28,11 @@ export async function getJSON(path, { timeoutMs = 12000 } = {}) {
   }
 }
 
+// Fetch global site settings exposed by the backend
+export function getSettings() {
+  return getJSON("/public/settings");
+}
+
 // Map filters -> URLSearchParams
 function toParams(filters = {}, paging = {}) {
   const p = new URLSearchParams();

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useContext, useEffect, useMemo, useState } from "react";
 import { getJSON } from "../api";
 import { normalizeCar } from "../utils/normalizeCar";
 import { fmtNum, fmtMoney, fmtDate } from "../utils/text";
@@ -8,6 +8,7 @@ import Chip from "../components/Chip";
 import Pagination from "../components/Pagination";
 import CarCard from "../components/CarCard";
 import SkeletonCard from "../components/SkeletonCard";
+import { SettingsContext } from "../App";
 
 const PAGE_SIZE = 12;
 
@@ -23,6 +24,7 @@ export default function Home() {
   const [source, setSource] = useState("");
 
   const [page, setPage] = useState(1);
+  const settings = useContext(SettingsContext);
 
   useEffect(() => {
     (async () => {
@@ -96,7 +98,7 @@ export default function Home() {
       {/* Futuristic hero */}
       <section className="hero">
         <div className="hero-inner">
-          <h1>Discover performance & provenance</h1>
+          <h1>{settings.site_tagline || "Discover performance & provenance"}</h1>
           <p className="sub">Search curated listings across enthusiast markets with clean specs and history highlights.</p>
           <div className="kpis">
             <div className="kpi"><span className="k">Total cars</span><span className="v">{kpis? fmtNum(kpis.total):"—"}</span></div>
