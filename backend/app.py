@@ -122,22 +122,6 @@ def admin_login_form(request: Request):
     # Also set a cookie (harmless; keeps some clients happy)
     resp.set_cookie("csrftoken", t, samesite="lax")
     return resp
-def admin_login(request: Request, username: str = Form(...), password: str = Form(...), csrf: str = Form(...)):
-    # rate limit: 5 fails per 10 min per IP
-    ip = get_ip(request)
-    now = time.time()
-    FAILED_LOGINS.setdefault(ip, [])
-    FAILED_LOGINS[ip] = [t for t in FAILED_LOGINS[ip] if now - t < 600]
-    if len(FAILED_LOGINS[ip]) >= 5:
-        raise HTTPException(status_code=429, detail="Too many attempts. Try later.")
-    require_csrf(request, csrf)
-    if username == settings.ADMIN_USER and password == settings.ADMIN_PASS:
-        request.session["admin_user"] = username
-        flash(request, "Welcome back!", "success")
-        return RedirectResponse("/admin", status_code=303)
-    FAILED_LOGINS[ip].append(now)
-    flash(request, "Invalid credentials", "error")
-    return RedirectResponse("/admin/login", status_code=303)
 
 @app.get("/admin/logout")
 def admin_logout(request: Request):
