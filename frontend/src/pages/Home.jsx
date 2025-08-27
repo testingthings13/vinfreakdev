@@ -10,8 +10,6 @@ import CarCard from "../components/CarCard";
 import SkeletonCard from "../components/SkeletonCard";
 import { SettingsContext } from "../App";
 
-const PAGE_SIZE = 12;
-
 export default function Home() {
   const [raw, setRaw] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -25,6 +23,7 @@ export default function Home() {
 
   const [page, setPage] = useState(1);
   const settings = useContext(SettingsContext);
+  const PAGE_SIZE = Number(settings.default_page_size) || 12;
 
   useEffect(() => {
     (async () => {
@@ -91,7 +90,7 @@ export default function Home() {
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const start = (page-1)*PAGE_SIZE;
   const pageItems = sorted.slice(start, start + PAGE_SIZE);
-  useEffect(()=>{ setPage(1); }, [q, minYear, maxYear, source, sort]);
+  useEffect(()=>{ setPage(1); }, [q, minYear, maxYear, source, sort, PAGE_SIZE]);
 
   return (
     <div>
@@ -129,7 +128,7 @@ export default function Home() {
 
       {/* Grid */}
       <section className="grid">
-        {loading && Array.from({length:12}).map((_,i)=> <SkeletonCard key={i} />)}
+        {loading && Array.from({length:PAGE_SIZE}).map((_,i)=> <SkeletonCard key={i} />)}
         {!loading && !error && pageItems.map(c => <CarCard key={c.__id} car={c} />)}
         {!loading && !error && !total && <div className="state">No cars match your filters.</div>}
         {!loading && error && <div className="state error">Error: {error}</div>}

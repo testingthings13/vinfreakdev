@@ -15,6 +15,15 @@
       <option value="light" {{ 'selected' if settings.get('theme')=='light' else '' }}>Light</option>
     </select>
   </label>
+  <label>Contact Email
+    <input type="email" name="contact_email" value="{{ settings.get('contact_email','') }}">
+  </label>
+  <label>Default Page Size
+    <input type="number" name="default_page_size" value="{{ settings.get('default_page_size','12') }}">
+  </label>
+  <label>Maintenance Banner
+    <input type="text" name="maintenance_banner" value="{{ settings.get('maintenance_banner','') }}">
+  </label>
   <div class="logo-row">
     <div>
       <label>Upload Logo <input type="file" name="logo"></label>

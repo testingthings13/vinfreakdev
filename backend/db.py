@@ -73,6 +73,9 @@ def init_db():
             "site_tagline": "Discover performance & provenance",
             "theme": "dark",
             "logo_url": "",
+            "contact_email": "",
+            "default_page_size": "12",
+            "maintenance_banner": "",
         }
         for k, v in defaults.items():
             r = s.exec(text("SELECT key FROM settings WHERE key=:k").bindparams(k=k)).first()
