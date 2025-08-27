@@ -120,9 +120,6 @@ def audit(actor: str, action: str, table: str, row_id: str, before: dict|None, a
 # --------- Auth views ----------
 @app.get("/admin/login")
 def admin_login_form(request: Request):
-    from starlette.responses import RedirectResponse
-    return RedirectResponse(url='/admin', status_code=303)
-    return RedirectResponse(url='/admin', status_code=303)
     t = csrf_token(request)
     # Render the themed template
     resp = templates.TemplateResponse(
