@@ -425,6 +425,7 @@ async def admin_login(request: Request):
     username = form.get("username", "")
     password = form.get("password", "")
     if username == settings.ADMIN_USER and password == settings.ADMIN_PASS:
+        request.session["admin_user"] = username
         request.session["admin"] = True
         request.session["csrf_token"] = token_urlsafe(32)  # rotate token
         return RedirectResponse(url="/admin", status_code=303)
