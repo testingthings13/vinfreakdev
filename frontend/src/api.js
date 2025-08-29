@@ -1,12 +1,21 @@
 // Unified API helper that supports both array and {items,total,...} responses
 const DEFAULT_BASE = (() => {
   const orig = window.location.origin;
-  // If hosted on a split Render setup (frontend at -1 domain, backend without),
-  // rewrite the origin to point to the backend.
-  if (orig.match(/-1\.onrender\.com$/)) return orig.replace(/-1\.onrender\.com$/, ".onrender.com");
-  return orig;
+  try {
+    const url = new URL(orig);
+    // If hosted on Render where the frontend lives on a "-1" subdomain and the
+    // backend on the main domain, rewrite accordingly so API calls always hit
+    // the backend. This covers both https://foo-1.onrender.com and
+    // https://foo.onrender.com.
+    url.hostname = url.hostname.replace(/-1\.onrender\.com$/, ".onrender.com");
+    return url.origin;
+  } catch {
+    return orig;
+  }
 })();
-const BASE = (import.meta.env.VITE_API_BASE ?? DEFAULT_BASE).replace(/\/+$/, "");
+
+// Allow an explicit VITE_API_BASE but fall back to DEFAULT_BASE for empty strings
+const BASE = (import.meta.env.VITE_API_BASE || DEFAULT_BASE).replace(/\/+$/, "");
 
 // Generic JSON fetch with timeout
 export async function getJSON(path, { timeoutMs = 12000 } = {}) {
