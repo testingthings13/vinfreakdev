@@ -54,7 +54,7 @@ nav a.active{color:var(--accent);font-weight:700}
 .ctitle{text-decoration:none;font-weight:800}
 .meta{margin-left:auto;display:flex;align-items:center;gap:6px}
 .source-logo{width:22px;height:22px;object-fit:contain;display:block}
-.dealership-logo{width:22px;height:22px;object-fit:contain;display:block}
+.dealership-logo{width:40px;height:40px;object-fit:cover;display:block;border-radius:50%}
 
 .brief{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
 .badge{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border-radius:999px;border:1px solid var(--border); background:rgba(255,255,255,.06); font-size:12px}
