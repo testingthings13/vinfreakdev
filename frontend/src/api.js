@@ -10,9 +10,18 @@
 // lives on the root domain. Strip the suffix so API calls reach the backend.
 const DEFAULT_BASE = (() => {
   let origin = window.location.origin;
-  origin = origin.replace(/-1(?=\.onrender\.com)/, "");
+  // Handle Render preview environments which append a numeric suffix
+  // (e.g. -1, -2) to the subdomain by stripping any "-number" before
+  // ".onrender.com" so API calls target the root domain where the
+  // backend lives.
+  origin = origin.replace(/-\d+(?=\.onrender\.com)/, "");
   return origin;
 })();
+
+// Final API base URL. Use VITE_API_BASE env var if provided at build time
+// (e.g. when the frontend is served from a different domain), otherwise
+// fall back to the origin-derived default above.
+const BASE = import.meta.env.VITE_API_BASE || DEFAULT_BASE;
 
 
 // Generic JSON fetch with timeout
