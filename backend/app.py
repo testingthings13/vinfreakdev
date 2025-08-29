@@ -34,7 +34,7 @@ def require_admin(
 
 import io, csv, json, os, secrets, time
 from db import engine, init_db
-from models import Car, ImportJob, Setting, AdminAudit
+from models import Car, ImportJob, Setting, AdminAudit, Dealership
 try:
     from models import Make, Model, Category
 except Exception:  # during tests models may be stubbed
@@ -259,7 +259,12 @@ def admin_cars(
         categories = s.exec(select(Category).order_by(Category.name)).all()
         total = s.exec(text(f"SELECT COUNT(*) AS c FROM cars WHERE {where_sql}").bindparams(**args)).first()[0]
         rows = s.exec(
-            text(f"SELECT * FROM cars WHERE {where_sql} ORDER BY {sort_col} DESC LIMIT :per OFFSET :off").bindparams(**(dict(args, per=per, off=off)))).mappings().all()
+            text(
+                f"SELECT cars.*, dealerships.name AS dealership_name FROM cars "
+                f"LEFT JOIN dealerships ON dealerships.id = cars.dealership_id "
+                f"WHERE {where_sql} ORDER BY {sort_col} DESC LIMIT :per OFFSET :off"
+            ).bindparams(**(dict(args, per=per, off=off)))
+        ).mappings().all()
     last_page = max(1, (total + per - 1)//per)
     t = csrf_token(request)
     resp = templates.TemplateResponse(
@@ -295,6 +300,7 @@ def admin_car_new(request: Request, _=Depends(admin_session_required)):
         makes = s.exec(select(Make).order_by(Make.name)).all()
         models = s.exec(select(Model).order_by(Model.name)).all()
         categories = s.exec(select(Category).order_by(Category.name)).all()
+        dealerships = s.exec(select(Dealership).order_by(Dealership.name)).all()
     resp = templates.TemplateResponse(
         request,
         "admin_car_edit.html",
@@ -306,6 +312,7 @@ def admin_car_new(request: Request, _=Depends(admin_session_required)):
             "makes": makes,
             "models": models,
             "categories": categories,
+            "dealerships": dealerships,
             "flash": pop_flash(request),
         },
     )
@@ -321,7 +328,7 @@ def admin_car_create(
     auction_status: str = Form(None), lot_number: str = Form(None), source: str = Form(None),
     url: str = Form(None), title: str = Form(None), image_url: str = Form(None),
     description: str = Form(None), seller_name: str = Form(None), seller_rating: str = Form(None), seller_reviews: str = Form(None),
-    posted_at: str = Form(None),
+    posted_at: str = Form(None), dealership_id: int = Form(None),
     _=Depends(admin_session_required),
 ):
     require_csrf(request, csrf)
@@ -333,7 +340,7 @@ def admin_car_create(
                                        trim=trim, price=price, mileage=mileage, currency=currency,
                                        city=city, state=state, auction_status=auction_status, lot_number=lot_number, source=source,
                                        url=url, title=title, image_url=image_url, description=description, seller_name=seller_name,
-                                       seller_rating=seller_rating, seller_reviews=seller_reviews, posted_at=posted_at).items() if k in allowed}
+                                       seller_rating=seller_rating, seller_reviews=seller_reviews, posted_at=posted_at, dealership_id=dealership_id).items() if k in allowed}
         c = Car(**payload)
         s.add(c)
         s.flush()
@@ -359,6 +366,7 @@ def admin_car_edit(request: Request, car_id: int, _=Depends(admin_session_requir
         makes = s.exec(select(Make).order_by(Make.name)).all()
         models = s.exec(select(Model).order_by(Model.name)).all()
         categories = s.exec(select(Category).order_by(Category.name)).all()
+        dealerships = s.exec(select(Dealership).order_by(Dealership.name)).all()
     t = csrf_token(request)
     resp = templates.TemplateResponse(
         request,
@@ -371,6 +379,7 @@ def admin_car_edit(request: Request, car_id: int, _=Depends(admin_session_requir
             "makes": makes,
             "models": models,
             "categories": categories,
+            "dealerships": dealerships,
             "flash": pop_flash(request),
         },
     )
@@ -386,7 +395,7 @@ def admin_car_update(
     auction_status: str = Form(None), lot_number: str = Form(None), source: str = Form(None),
     url: str = Form(None), title: str = Form(None), image_url: str = Form(None),
     description: str = Form(None), seller_name: str = Form(None), seller_rating: str = Form(None), seller_reviews: str = Form(None),
-    posted_at: str = Form(None),
+    posted_at: str = Form(None), dealership_id: int = Form(None),
     _=Depends(admin_session_required),
 ):
     require_csrf(request, csrf)
@@ -398,7 +407,7 @@ def admin_car_update(
                                        trim=trim, price=price, mileage=mileage, currency=currency,
                                        city=city, state=state, auction_status=auction_status, lot_number=lot_number, source=source,
                                        url=url, title=title, image_url=image_url, description=description, seller_name=seller_name,
-                                       seller_rating=seller_rating, seller_reviews=seller_reviews, posted_at=posted_at).items() if k in allowed}
+                                       seller_rating=seller_rating, seller_reviews=seller_reviews, posted_at=posted_at, dealership_id=dealership_id).items() if k in allowed}
         car = s.get(Car, car_id)
         before = car.model_dump() if hasattr(car, "model_dump") else car.__dict__.copy()
         for k, v in payload.items():

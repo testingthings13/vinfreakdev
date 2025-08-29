@@ -4,10 +4,15 @@ import csv
 from io import StringIO
 
 from sqladmin import ModelView, expose
+from wtforms import FileField
 from starlette.requests import Request
 from starlette.responses import Response, PlainTextResponse, HTMLResponse
 
-from models import Car
+import os
+from uuid import uuid4
+
+from models import Car, Dealership
+from backend_settings import settings
 from db import engine
 from sqlmodel import Session, select, func
 
@@ -28,7 +33,7 @@ class CarAdmin(ModelView, model=Car):
     name_plural = "Cars"
     icon = "fa-solid fa-car"
 
-    column_list = [Car.id, Car.year, Car.make, Car.model, Car.vin, Car.source, Car.url, Car.created_at]
+    column_list = [Car.id, Car.year, Car.make, Car.model, Car.dealership_id, Car.vin, Car.source, Car.url, Car.created_at]
     column_sortable_list = [Car.year, Car.make, Car.model, Car.created_at, Car.source]
     column_searchable_list = [Car.vin, Car.make, Car.model, Car.source]
     column_default_sort = ("created_at", True)
@@ -36,9 +41,21 @@ class CarAdmin(ModelView, model=Car):
     column_formatters = {
         Car.url: lambda m, a: f'<a href="{m.url}" target="_blank">Open</a>' if m.url else "",
         Car.source: lambda m, a: f'<span class="badge source {(m.source or "unknown").lower()}">{m.source or "unknown"}</span>',
+        Car.dealership_id: lambda m, a: f'<span class="badge dealership">{m.dealership.name}</span>' if m.dealership else "",
     }
 
-    column_filters = [Car.source, Car.make, Car.year, Car.created_at]
+    column_filters = [Car.source, Car.make, Car.year, Car.created_at, Car.dealership_id]
+
+    column_labels = {Car.dealership_id: "Dealership"}
+
+    form_columns = [Car.vin, Car.year, Car.make_id, Car.model_id, Car.category_id, Car.trim, Car.price, Car.mileage, Car.currency,
+                    Car.city, Car.state, Car.auction_status, Car.lot_number, Car.source, Car.url, Car.title, Car.image_url,
+                    Car.description, Car.seller_name, Car.seller_rating, Car.seller_reviews, Car.posted_at, Car.dealership_id]
+    form_ajax_refs = {
+        "dealership": {
+            "fields": (Dealership.name,),
+        }
+    }
 
     async def action_export_csv(self, ids: List[Any]) -> Response:
         if not ids:
@@ -68,6 +85,38 @@ class CarAdmin(ModelView, model=Car):
         return PlainTextResponse(f"Deleted {len(ids)} item(s).")
 
     actions = [("Export CSV", "action_export_csv"), ("Delete selected", "action_delete_selected")]
+
+
+class DealershipAdmin(ModelView, model=Dealership):
+    name = "Dealership"
+    name_plural = "Dealerships"
+    icon = "fa-solid fa-building"
+
+    column_list = [Dealership.id, Dealership.name, Dealership.logo]
+    form_columns = [Dealership.name, "logo_file"]
+    form_extra_fields = {
+        "logo_file": FileField("Logo"),
+    }
+
+    async def _handle_logo(self, data: dict):
+        file = data.pop("logo_file", None)
+        if file and getattr(file, "filename", None):
+            upload_dir = settings.UPLOAD_DIR
+            os.makedirs(upload_dir, exist_ok=True)
+            fname = f"{uuid4().hex}_{file.filename}"
+            path = os.path.join(upload_dir, fname)
+            content = file.read() if hasattr(file, "read") else await file.read()
+            with open(path, "wb") as f:
+                f.write(content)
+            data["logo"] = fname
+
+    async def insert_model(self, request, data):
+        await self._handle_logo(data)
+        return await super().insert_model(request, data)
+
+    async def update_model(self, request, pk, data):
+        await self._handle_logo(data)
+        return await super().update_model(request, pk, data)
 
 class DashboardView(ModelView):
     name = "Dashboard"

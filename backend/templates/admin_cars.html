@@ -67,7 +67,7 @@
 <table class="table">
   <thead><tr>
     <th><input type="checkbox" id="chk_all" onclick="toggleAll(this)"></th>
-    <th>Thumb</th><th>Title</th><th>VIN</th><th>Year</th><th>Price</th><th>Status</th><th>Source</th><th></th>
+    <th>Thumb</th><th>Title</th><th>VIN</th><th>Year</th><th>Price</th><th>Status</th><th>Source</th><th>Dealership</th><th></th>
   </tr></thead>
   <tbody>
   {% for c in cars %}
@@ -84,6 +84,7 @@
       <td>{{ (("{:,.0f}".format(c.price)) if c.price else "") ~ " " ~ (c.currency or "") }}</td>
       <td>{{ c.auction_status or '' }}</td>
       <td>{{ c.source or '' }}</td>
+      <td>{% if c.dealership_name %}<span class="badge dealership">{{ c.dealership_name }}</span>{% endif %}</td>
       <td><a href="/admin/cars/{{ c.id }}">Edit</a> | <a href="/admin/cars/{{ c.id }}/delete" onclick="return confirm('Delete?')">Delete</a></td>
     </tr>
   {% endfor %}
