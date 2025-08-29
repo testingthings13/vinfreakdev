@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { getJSON } from "../api";
+import { getJSON, getDealerships } from "../api";
 import { normalizeCar } from "../utils/normalizeCar";
 import useDebounce from "../utils/useDebounce";
 import SearchBar from "../components/SearchBar";
@@ -21,7 +21,8 @@ export default function CarList() {
   const [sort, setSort] = useState("relevance");
   const [minYear, setMinYear] = useState(null);
   const [maxYear, setMaxYear] = useState(null);
-  const [source, setSource] = useState("");
+  const [dealershipId, setDealershipId] = useState("");
+  const [dealerships, setDealerships] = useState([]);
 
   const [page, setPage] = useState(1);
 
@@ -30,10 +31,16 @@ export default function CarList() {
     (async () => {
       try {
         setLoading(true);
-        const data = await getJSON("/cars");
-        const list = Array.isArray(data) ? data : (data.items || data.results || []);
+        const [carData, dealerData] = await Promise.all([
+          getJSON("/cars"),
+          getDealerships(),
+        ]);
+        const dealerList = Array.isArray(dealerData) ? dealerData : (dealerData.items || dealerData.results || []);
+        setDealerships(dealerList);
+        const dealerMap = Object.fromEntries(dealerList.map(d => [d.id, d]));
+        const list = Array.isArray(carData) ? carData : (carData.items || carData.results || []);
         if (!Array.isArray(list)) throw new Error("Backend did not return an array at /cars.");
-        setRaw(list.map(normalizeCar));
+        setRaw(list.map(c => ({ ...normalizeCar(c), dealership: dealerMap[c.dealership_id] }))); 
       } catch (e) {
         addToast(String(e), "error");
       } finally {
@@ -53,10 +60,10 @@ export default function CarList() {
       return hay.includes(text);
     };
     const byYear = (c) => (minYear ? (c.__year ?? 0) >= minYear : true) && (maxYear ? (c.__year ?? 9999) <= maxYear : true);
-    const bySource = (c) => source ? String(c.__source || "").includes(source.toLowerCase()) : true;
+    const byDealership = (c) => (dealershipId ? String(c.dealership_id) === String(dealershipId) : true);
 
-    return raw.filter(c => byText(c) && byYear(c) && bySource(c));
-  }, [raw, dq, minYear, maxYear, source]);
+    return raw.filter(c => byText(c) && byYear(c) && byDealership(c));
+  }, [raw, dq, minYear, maxYear, dealershipId]);
 
   // Sort
   const sorted = useMemo(() => {
@@ -83,7 +90,7 @@ export default function CarList() {
   const total = sorted.length;
   const start = (page - 1) * PAGE_SIZE;
   const pageItems = sorted.slice(start, start + PAGE_SIZE);
-  useEffect(() => { setPage(1); }, [dq, minYear, maxYear, source, sort]);
+  useEffect(() => { setPage(1); }, [dq, minYear, maxYear, dealershipId, sort]);
 
   if (loading) return <div className="state">Loading cars…</div>;
 
@@ -95,7 +102,8 @@ export default function CarList() {
           sort={sort} setSort={setSort}
           minYear={minYear} setMinYear={setMinYear}
           maxYear={maxYear} setMaxYear={setMaxYear}
-          source={source} setSource={setSource}
+          dealershipId={dealershipId} setDealershipId={setDealershipId}
+          dealerships={dealerships}
         />
       </div>
 
