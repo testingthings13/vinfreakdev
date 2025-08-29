@@ -34,7 +34,7 @@ def require_admin(
 
 import io, csv, json, os, secrets, time
 from db import engine, init_db
-from models import Car, ImportJob, Setting, AdminAudit
+from models import Car, ImportJob, Setting, AdminAudit, Dealership
 try:
     from models import Make, Model, Category
 except Exception:  # during tests models may be stubbed
@@ -149,24 +149,66 @@ def admin_logout(request: Request):
 
 # -------- public API used by frontend --------
 @app.get("/cars")
-def list_cars():
+def list_cars(dealership_id: int | None = Query(None)):
+    """List cars with optional dealership filtering."""
+    if not isinstance(dealership_id, (int, type(None))):
+        dealership_id = None
     # ORM first
     try:
         with DBSession(engine) as s:
             stmt = select(Car).where((Car.deleted_at.is_(None)))
+            if dealership_id is not None:
+                stmt = stmt.where(Car.dealership_id == dealership_id)
             # order by posted_at desc if present else id desc
             order_col = getattr(Car, "posted_at", Car.id)
             cars = s.exec(stmt.order_by(order_col.desc())).all()
-            try:
-                return [c.model_dump() for c in cars]
-            except Exception:
-                return [ {k:getattr(c,k,None) for k in ("id","vin","year","make","model","price","currency","source","url","title","description","image_url","posted_at")} for c in cars ]
+            ids = {getattr(c, "dealership_id", None) for c in cars if getattr(c, "dealership_id", None)}
+            dealerships = {}
+            if ids:
+                dealerships = {d.id: d for d in s.exec(select(Dealership).where(Dealership.id.in_(ids))).all()}
+            result = []
+            for c in cars:
+                try:
+                    data = c.model_dump()
+                except Exception:
+                    data = {k: getattr(c, k, None) for k in ("id","vin","year","make","model","price","currency","source","url","title","description","image_url","posted_at","dealership_id")}
+                d = dealerships.get(getattr(c, "dealership_id", None))
+                if d:
+                    try:
+                        data["dealership"] = d.model_dump()
+                    except Exception:
+                        data["dealership"] = {"id": d.id, "name": d.name, "logo_url": getattr(d, "logo_url", None)}
+                else:
+                    data["dealership"] = None
+                result.append(data)
+            return result
     except Exception:
         pass
     # raw fallback
     with DBSession(engine) as s:
-        rows = s.exec(text("SELECT * FROM cars WHERE deleted_at IS NULL ORDER BY COALESCE(posted_at,'') DESC, id DESC")).mappings().all()
-        return [ dict(r) for r in rows ]
+        sql = """
+            SELECT cars.*, d.id AS d_id, d.name AS d_name, d.logo_url AS d_logo
+            FROM cars LEFT JOIN dealerships d ON cars.dealership_id = d.id
+            WHERE cars.deleted_at IS NULL
+        """
+        args = {}
+        if dealership_id is not None:
+            sql += " AND cars.dealership_id = :dealership_id"
+            args["dealership_id"] = dealership_id
+        sql += " ORDER BY COALESCE(cars.posted_at,'') DESC, cars.id DESC"
+        rows = s.exec(text(sql).bindparams(**args)).mappings().all()
+        res = []
+        for r in rows:
+            car = dict(r)
+            d = None
+            if r.get("d_id") is not None:
+                d = {"id": r["d_id"], "name": r["d_name"], "logo_url": r["d_logo"]}
+            car.pop("d_id", None)
+            car.pop("d_name", None)
+            car.pop("d_logo", None)
+            car["dealership"] = d
+            res.append(car)
+        return res
 
 @app.get("/cars/{id}")
 def get_car(id: str):
@@ -181,7 +223,30 @@ def get_car(id: str):
             car = s.exec(select(Car).where((Car.lot_number == id))).first()
         if not car or getattr(car, "deleted_at", None):
             return {"detail": "Not found"}
-        return car.model_dump() if hasattr(car, "model_dump") else dict(car)
+        try:
+            data = car.model_dump()
+        except Exception:
+            data = {k: getattr(car, k, None) for k in ("id","vin","year","make","model","price","currency","source","url","title","description","image_url","posted_at","dealership_id")}
+        d = None
+        if getattr(car, "dealership_id", None):
+            d = s.get(Dealership, car.dealership_id)
+        if d:
+            try:
+                data["dealership"] = d.model_dump()
+            except Exception:
+                data["dealership"] = {"id": d.id, "name": d.name, "logo_url": getattr(d, "logo_url", None)}
+        else:
+            data["dealership"] = None
+        return data
+
+@app.get("/dealerships")
+def list_dealerships():
+    with DBSession(engine) as s:
+        ds = s.exec(select(Dealership).order_by(Dealership.name)).all()
+        try:
+            return [d.model_dump() for d in ds]
+        except Exception:
+            return [{"id": d.id, "name": d.name, "logo_url": getattr(d, "logo_url", None)} for d in ds]
 
 @app.get("/public/settings")
 def public_settings():
