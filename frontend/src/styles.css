@@ -31,12 +31,6 @@ nav a.active{color:var(--accent);font-weight:700}
 .search{width:100%;padding:12px 14px;border-radius:12px;border:1px solid var(--border); background:rgba(8,12,26,.7); color:#fff; outline:none}
 .search:focus{box-shadow:0 0 0 3px #6ea8ff33;border-color:#6ea8ff66}
 
-.filters{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;margin:12px 0 16px}
-.filters input,.filters select{padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:var(--panel);color:var(--fg);outline:none}
-.filters button{padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:rgba(255,255,255,.04);color:#fff;cursor:pointer}
-.filters button:hover{filter:brightness(1.05)}
-@media (max-width: 920px){ .filters{grid-template-columns:repeat(3,minmax(0,1fr));} }
-@media (max-width: 560px){ .filters{grid-template-columns:repeat(2,minmax(0,1fr));} }
 
 .toolbar-row{display:flex;flex-direction:column;gap:10px;margin:14px 0}
 .facets{display:flex;gap:10px;flex-wrap:wrap}
