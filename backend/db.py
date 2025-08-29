@@ -1,7 +1,7 @@
 from sqlmodel import create_engine, SQLModel, Session
 from sqlalchemy import text
 from backend_settings import settings
-from models import Make, Model, Category, Dealership
+
 
 
 def ensure_columns():
@@ -89,3 +89,24 @@ def init_db():
             if not r:
                 s.exec(text("INSERT INTO settings(key,value) VALUES (:k,:v)").bindparams(k=k, v=v))
         s.commit()
+        # Seed existing dealerships from seller_name if available
+        try:
+            rows = s.exec(
+                text(
+                    "SELECT DISTINCT seller_name FROM cars WHERE seller_name IS NOT NULL AND seller_name != ''"
+                )
+            ).all()
+            for (name,) in rows:
+                s.exec(text("INSERT OR IGNORE INTO dealerships(name) VALUES (:n)").bindparams(n=name))
+                s.exec(
+                    text(
+                        """
+                        UPDATE cars
+                        SET dealership_id = (SELECT id FROM dealerships WHERE name=:n)
+                        WHERE seller_name = :n AND (dealership_id IS NULL OR dealership_id = 0)
+                        """
+                    ).bindparams(n=name)
+                )
+            s.commit()
+        except Exception as e:
+            print("init_db: dealership seed failed:", e)
