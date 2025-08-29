@@ -1066,19 +1066,4 @@ def frontend_root():
     raise HTTPException(status_code=404, detail="Frontend not built")
 
 
-@app.get("/car/{car_id}")
-def frontend_car_page(car_id: str):
-    """Serve the SPA for direct car links or fall back to API JSON.
 
-    In environments where the compiled frontend assets are unavailable the
-    previously implemented behaviour returned a 404 which confused users
-    even though the car existed in the database. Instead, if the built
-    ``index.html`` cannot be found we simply return the same JSON payload as
-    the public ``/cars/{id}`` endpoint. When the SPA bundle is present the
-    route continues to deliver the HTML shell so the client side router can
-    render the page.
-    """
-    if FRONTEND_INDEX.exists():
-        return HTMLResponse(FRONTEND_INDEX.read_text())
-    # Fall back to the JSON API if no frontend is available
-    return get_car(car_id)
