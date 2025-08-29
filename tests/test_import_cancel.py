@@ -4,7 +4,7 @@ if 'sqlmodel' in sys.modules:
     del sys.modules['sqlmodel']
 real_sqlmodel = importlib.import_module("sqlmodel")
 sys.modules['sqlmodel'] = real_sqlmodel
-from sqlmodel import SQLModel, Session, create_engine
+from sqlmodel import SQLModel, Session, create_engine, select
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 
@@ -27,12 +27,13 @@ sys.path.append(str(ROOT))
 engine = create_engine("sqlite://", connect_args={"check_same_thread": False})
 
 def _init_db():
+    SQLModel.metadata.drop_all(engine)
     SQLModel.metadata.create_all(engine)
 
 sys.modules['db'] = types.SimpleNamespace(engine=engine, init_db=_init_db)
 import backend.models as real_models
 sys.modules['models'] = real_models
-from backend.models import ImportJob
+from backend.models import ImportJob, AdminAudit
 import importlib
 if 'backend.app' in sys.modules:
     del sys.modules['backend.app']
@@ -50,6 +51,8 @@ app_module.admin_session_required = lambda request: True
 class DummyRequest:
     def __init__(self):
         self.session = {}
+        self.headers = {}
+        self.client = types.SimpleNamespace(host="test")
 
 
 def test_cancel_queued_job_marks_cancelled():
@@ -66,6 +69,8 @@ def test_cancel_queued_job_marks_cancelled():
         job = s.get(ImportJob, jid)
         assert job.status == "cancelled"
         assert job.cancellable is False
+        audit = s.exec(select(AdminAudit).where(AdminAudit.row_id == str(jid))).first()
+        assert audit is not None
 
 
 def test_cancel_finished_job_no_change():

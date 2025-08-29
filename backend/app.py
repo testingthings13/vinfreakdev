@@ -107,9 +107,18 @@ def require_csrf(request: Request, token: str):
     if token != request.session.get("csrf_token"):
         raise HTTPException(status_code=400, detail="CSRF token invalid")
 
-def audit(actor: str, action: str, table: str, row_id: str, before: dict|None, after: dict|None, ip: str):
-    with DBSession(engine) as s:
-        s.add(AdminAudit(
+def audit(
+    session: DBSession,
+    actor: str,
+    action: str,
+    table: str,
+    row_id: str,
+    before: dict | None,
+    after: dict | None,
+    ip: str,
+):
+    session.add(
+        AdminAudit(
             actor=actor,
             action=action,
             table_name=table,
@@ -118,8 +127,8 @@ def audit(actor: str, action: str, table: str, row_id: str, before: dict|None, a
             after_json=json.dumps(after, ensure_ascii=False) if after else None,
             ip=ip,
             created_at=datetime.now(timezone.utc).isoformat(),
-        ))
-        s.commit()
+        )
+    )
 
 # --------- Auth views ----------
 @app.get("/admin/login")
@@ -326,8 +335,20 @@ def admin_car_create(
                                        url=url, title=title, image_url=image_url, description=description, seller_name=seller_name,
                                        seller_rating=seller_rating, seller_reviews=seller_reviews, posted_at=posted_at).items() if k in allowed}
         c = Car(**payload)
-        s.add(c); s.commit()
-        audit(request.session.get("admin_user","admin"), "create", "cars", c.id, None, payload, get_ip(request))
+        s.add(c)
+        s.flush()
+        after = c.model_dump() if hasattr(c, "model_dump") else payload
+        audit(
+            s,
+            request.session.get("admin_user", "admin"),
+            "create",
+            "cars",
+            c.id,
+            None,
+            after,
+            get_ip(request),
+        )
+        s.commit()
     flash(request, "Car created", "success")
     return RedirectResponse("/admin/cars", status_code=303)
 
@@ -379,10 +400,21 @@ def admin_car_update(
                                        url=url, title=title, image_url=image_url, description=description, seller_name=seller_name,
                                        seller_rating=seller_rating, seller_reviews=seller_reviews, posted_at=posted_at).items() if k in allowed}
         car = s.get(Car, car_id)
-        before = car.model_dump() if hasattr(car,"model_dump") else car.__dict__.copy()
-        for k,v in payload.items(): setattr(car,k,v)
-        s.add(car); s.commit()
-        audit(request.session.get("admin_user","admin"), "update", "cars", car_id, before, payload, get_ip(request))
+        before = car.model_dump() if hasattr(car, "model_dump") else car.__dict__.copy()
+        for k, v in payload.items():
+            setattr(car, k, v)
+        audit(
+            s,
+            request.session.get("admin_user", "admin"),
+            "update",
+            "cars",
+            car_id,
+            before,
+            payload,
+            get_ip(request),
+        )
+        s.add(car)
+        s.commit()
     flash(request, "Car updated", "success")
     return RedirectResponse("/admin/cars", status_code=303)
 
@@ -392,10 +424,20 @@ def admin_car_delete(request: Request, car_id: int, _=Depends(admin_session_requ
     with DBSession(engine) as s:
         car = s.get(Car, car_id)
         if car:
-            before = car.model_dump() if hasattr(car,"model_dump") else None
+            before = car.model_dump() if hasattr(car, "model_dump") else None
             car.deleted_at = datetime.now(timezone.utc).isoformat()
-            s.add(car); s.commit()
-            audit(request.session.get("admin_user","admin"), "delete", "cars", car_id, before, {"deleted_at": car.deleted_at}, get_ip(request))
+            audit(
+                s,
+                request.session.get("admin_user", "admin"),
+                "delete",
+                "cars",
+                car_id,
+                before,
+                {"deleted_at": car.deleted_at},
+                get_ip(request),
+            )
+            s.add(car)
+            s.commit()
     flash(request, "Car deleted", "success")
     return RedirectResponse("/admin/cars", status_code=303)
 
@@ -406,24 +448,39 @@ def admin_cars_bulk(request: Request, csrf: str = Form(...), ids: str = Form(...
     id_list = [int(x) for x in ids.split(",") if x.strip().isdigit()]
     with DBSession(engine) as s:
         if action == "delete":
-            (
-    lambda _ids: (
-        (lambda _sql, _params: s.exec(text(_sql).bindparams(**_params)))(
-            "UPDATE cars SET deleted_at=:ts WHERE id IN (" + ",".join([f":id{i}" for i,_ in enumerate(_ids)]) + ")",
-            dict({"ts": datetime.now(timezone.utc).isoformat()}, **{f"id{i}": v for i,v in enumerate(_ids)})
-        )
-    )
-)(id_list)
+            ts = datetime.now(timezone.utc).isoformat()
+            for cid in id_list:
+                car = s.get(Car, cid)
+                if car:
+                    before = car.model_dump() if hasattr(car, "model_dump") else None
+                    car.deleted_at = ts
+                    audit(
+                        s,
+                        request.session.get("admin_user", "admin"),
+                        "delete",
+                        "cars",
+                        cid,
+                        before,
+                        {"deleted_at": ts},
+                        get_ip(request),
+                    )
             flash(request, f"Deleted {len(id_list)} car(s)", "success")
-        elif action in ("LIVE","SOLD","RESERVE_NOT_MET","ENDED","DRAFT"):
-            (
-    lambda _ids: (
-        (lambda _sql, _params: s.exec(text(_sql).bindparams(**_params)))(
-            "UPDATE cars SET auction_status=:st WHERE id IN (" + ",".join([f":id{i}" for i,_ in enumerate(_ids)]) + ")",
-            dict({"st": action}, **{f"id{i}": v for i,v in enumerate(_ids)})
-        )
-    )
-)(id_list)
+        elif action in ("LIVE", "SOLD", "RESERVE_NOT_MET", "ENDED", "DRAFT"):
+            for cid in id_list:
+                car = s.get(Car, cid)
+                if car:
+                    before = {"auction_status": car.auction_status}
+                    car.auction_status = action
+                    audit(
+                        s,
+                        request.session.get("admin_user", "admin"),
+                        "update",
+                        "cars",
+                        cid,
+                        before,
+                        {"auction_status": action},
+                        get_ip(request),
+                    )
             flash(request, f"Updated status for {len(id_list)} car(s)", "success")
         s.commit()
     return RedirectResponse("/admin/cars", status_code=303)
@@ -459,12 +516,37 @@ async def admin_cars_import(request: Request, csrf: str = Form(...), file: Uploa
             vin = (data.get("vin") or "").strip()
             car = None
             if vin:
-                car = s.exec(select(Car).where(Car.vin==vin)).first()
+                car = s.exec(select(Car).where(Car.vin == vin)).first()
             if car:
-                for k,v in data.items(): setattr(car,k,v)
+                before = car.model_dump() if hasattr(car, "model_dump") else car.__dict__.copy()
+                for k, v in data.items():
+                    setattr(car, k, v)
+                audit(
+                    s,
+                    request.session.get("admin_user", "admin"),
+                    "update",
+                    "cars",
+                    car.id,
+                    before,
+                    data,
+                    get_ip(request),
+                )
                 updated += 1
             else:
-                s.add(Car(**data)); inserted += 1
+                car = Car(**data)
+                s.add(car)
+                s.flush()
+                audit(
+                    s,
+                    request.session.get("admin_user", "admin"),
+                    "create",
+                    "cars",
+                    car.id,
+                    None,
+                    data,
+                    get_ip(request),
+                )
+                inserted += 1
         s.commit()
     flash(request, f"Import done: {inserted} inserted, {updated} updated", "success")
     return RedirectResponse("/admin/cars", status_code=303)
@@ -501,6 +583,18 @@ def admin_imports_run(
             source=source, status="queued", created=datetime.now(timezone.utc).isoformat()
         )
         s.add(job)
+        s.flush()
+        after = job.model_dump() if hasattr(job, "model_dump") else job.__dict__.copy()
+        audit(
+            s,
+            request.session.get("admin_user", "admin"),
+            "create",
+            "import_jobs",
+            job.id,
+            None,
+            after,
+            get_ip(request),
+        )
         s.commit()
     flash(request, "Import queued", "success")
     return RedirectResponse("/admin/imports", status_code=303)
@@ -539,9 +633,24 @@ def admin_import_cancel(
         if job.status not in ("queued", "running") or job.cancellable is False:
             flash(request, "Job cannot be cancelled", "error")
         else:
+            before = job.model_dump() if hasattr(job, "model_dump") else job.__dict__.copy()
             job.status = "cancelled"
             job.finished_at = datetime.now(timezone.utc).isoformat()
             job.cancellable = False
+            audit(
+                s,
+                request.session.get("admin_user", "admin"),
+                "update",
+                "import_jobs",
+                id,
+                before,
+                {
+                    "status": "cancelled",
+                    "finished_at": job.finished_at,
+                    "cancellable": False,
+                },
+                get_ip(request),
+            )
             s.add(job)
             s.commit()
             flash(request, "Job cancelled", "success")
@@ -586,40 +695,38 @@ async def admin_settings_save(
         with dest.open("wb") as f:
             f.write(await logo.read())
         logo_url = f"/uploads/{logo.filename}"
-    before = None
+    updates = {
+        "site_title": site_title,
+        "site_tagline": site_tagline,
+        "theme": theme,
+        "logo_url": logo_url,
+        "contact_email": contact_email,
+        "default_page_size": default_page_size,
+        "maintenance_banner": maintenance_banner,
+    }
     with DBSession(engine) as s:
-        # simple upserts
-        for k, v in {
-            "site_title": site_title,
-            "site_tagline": site_tagline,
-            "theme": theme,
-            "logo_url": logo_url,
-            "contact_email": contact_email,
-            "default_page_size": default_page_size,
-            "maintenance_banner": maintenance_banner,
-        }.items():
+        before = {
+            r["key"]: r["value"]
+            for r in s.exec(text("SELECT key,value FROM settings")).mappings().all()
+        }
+        for k, v in updates.items():
             s.exec(
                 text(
                     "INSERT INTO settings(key,value) VALUES(:k,:v) ON CONFLICT(key) DO UPDATE SET value=:v"
                 ).bindparams(k=k, v=v)
             )
+        audit(
+            s,
+            request.session.get("admin_user", "admin"),
+            "settings",
+            "settings",
+            "-",
+            before,
+            updates,
+            get_ip(request),
+        )
         s.commit()
     flash(request, "Settings saved", "success")
-    audit(
-        request.session.get("admin_user", "admin"),
-        "settings",
-        "settings",
-        "-",
-        before,
-        {
-            "theme": theme,
-            "logo_url": logo_url,
-            "contact_email": contact_email,
-            "default_page_size": default_page_size,
-            "maintenance_banner": maintenance_banner,
-        },
-        get_ip(request),
-    )
     return RedirectResponse("/admin/settings", status_code=303)
 
 
