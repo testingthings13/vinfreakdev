@@ -1066,8 +1066,3 @@ def frontend_root():
     raise HTTPException(status_code=404, detail="Frontend not built")
 
 
-@app.get("/car/{car_id}", response_class=HTMLResponse)
-def frontend_car_page(car_id: str):
-    if FRONTEND_INDEX.exists():
-        return HTMLResponse(FRONTEND_INDEX.read_text())
-    raise HTTPException(status_code=404, detail="Frontend not built")
