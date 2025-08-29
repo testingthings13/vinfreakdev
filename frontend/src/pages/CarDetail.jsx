@@ -4,6 +4,7 @@ import { getJSON } from "../api";
 import Gallery from "../components/Gallery";
 import SourceLogo from "../components/SourceLogo";
 import { fmtMoney, fmtNum, fmtDate, toList } from "../utils/text";
+import { useToast } from "../ToastContext";
 
 const SHOW_KEYS = [
   ["Year","year"], ["Make","make"], ["Model","model"], ["Trim","trim"],
@@ -20,8 +21,8 @@ const SHOW_KEYS = [
 export default function CarDetail() {
   const { id } = useParams();
   const [car, setCar] = useState(null);
-  const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const { addToast } = useToast();
 
   useEffect(()=> {
     (async () => {
@@ -29,8 +30,9 @@ export default function CarDetail() {
         setLoading(true);
         const data = await getJSON(`/cars/${encodeURIComponent(id)}`);
         setCar(data);
-      } catch (e) { setError(String(e)); }
-      finally { setLoading(false); }
+      } catch (e) {
+        addToast(String(e), "error");
+      } finally { setLoading(false); }
     })();
   }, [id]);
 
@@ -54,7 +56,6 @@ export default function CarDetail() {
   const sourceHidden = String(car?.source||"").toLowerCase() === "json_import";
 
   if (loading) return <div className="state">Loading…</div>;
-  if (error) return <div className="state error">Error: {error}</div>;
   if (!car) return <div className="state">Not found.</div>;
 
   const highlights = toList(car.highlights);
@@ -65,7 +66,10 @@ export default function CarDetail() {
   const notes = toList(car.seller_notes || car.other_items || car.ownership_history);
 
   const copyVin = async () => {
-    try { await navigator.clipboard.writeText(String(car.vin || "")); alert("VIN copied to clipboard"); } catch {}
+    try {
+      await navigator.clipboard.writeText(String(car.vin || ""));
+      addToast("VIN copied to clipboard");
+    } catch {}
   };
 
   return (

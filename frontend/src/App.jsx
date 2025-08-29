@@ -4,6 +4,7 @@ import Home from "./pages/Home";
 import CarDetail from "./pages/CarDetail";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { getSettings } from "./api";
+import { useToast } from "./ToastContext";
 
 export const SettingsContext = createContext({
   site_title: "VINFREAK",
@@ -26,6 +27,8 @@ export default function App() {
     maintenance_banner: "",
   });
 
+  const { addToast } = useToast();
+
   useEffect(() => {
     (async () => {
       try {
@@ -35,10 +38,10 @@ export default function App() {
           if (s.site_title) document.title = s.site_title;
         }
       } catch (e) {
-        console.error("Failed to load settings", e);
+        addToast("Failed to load settings", "error");
       }
     })();
-  }, []);
+  }, [addToast]);
 
   return (
     <SettingsContext.Provider value={settings}>
