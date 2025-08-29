@@ -31,13 +31,10 @@ export default function CarDetail() {
         const data = await getJSON(`/cars/${encodeURIComponent(id)}`);
         setCar(data);
       } catch (e) {
-        try {
-          const alt = await getJSON(`/car/${encodeURIComponent(id)}`);
-          setCar(alt);
-        } catch (e2) {
-          addToast(String(e2), "error");
-        }
-      } finally { setLoading(false); }
+        addToast(String(e), "error");
+      } finally {
+        setLoading(false);
+      }
     })();
   }, [id, addToast]);
 
