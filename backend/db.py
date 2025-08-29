@@ -1,6 +1,7 @@
 from sqlmodel import create_engine, SQLModel, Session
 from sqlalchemy import text
 from backend_settings import settings
+from models import Make, Model, Category, Dealership
 
 
 
