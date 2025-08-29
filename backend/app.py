@@ -1,6 +1,6 @@
 from secrets import token_urlsafe
 import hmac
-from fastapi import FastAPI, Request, Depends, Form, UploadFile, File, Response, HTTPException
+from fastapi import FastAPI, Request, Depends, Form, UploadFile, File, Response, HTTPException, Query
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.templating import Jinja2Templates
@@ -9,7 +9,7 @@ from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from typing import Optional
 from sqlmodel import Session as DBSession, select
 from sqlalchemy import text
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from sqlalchemy import func
 
@@ -117,7 +117,7 @@ def audit(actor: str, action: str, table: str, row_id: str, before: dict|None, a
             before_json=json.dumps(before, ensure_ascii=False) if before else None,
             after_json=json.dumps(after, ensure_ascii=False) if after else None,
             ip=ip,
-            created_at=datetime.utcnow().isoformat(),
+            created_at=datetime.now(timezone.utc).isoformat(),
         ))
         s.commit()
 
@@ -127,7 +127,7 @@ def admin_login_form(request: Request):
     t = csrf_token(request)
     # Render the themed template
     resp = templates.TemplateResponse(
-        "admin_login.html", {"request": request, "title": "Login", "csrf": t}
+        request, "admin_login.html", {"title": "Login", "csrf": t}
     )
     # Also set a cookie (harmless; keeps some clients happy)
     resp.set_cookie("csrftoken", t, samesite="lax")
@@ -185,8 +185,9 @@ def public_settings():
 def admin_index(request: Request, _=Depends(admin_session_required)):
     csrf_token(request)
     return templates.TemplateResponse(
+        request,
         "admin_index.html",
-        {"request": request, "title": "Dashboard", "flash": pop_flash(request)},
+        {"title": "Dashboard", "flash": pop_flash(request)},
     )
 
 def allowed_sorts():
@@ -202,10 +203,11 @@ def _maybe_int(val: Optional[str]) -> Optional[int]:
 @app.get("/admin/cars", response_class=HTMLResponse)
 def admin_cars(
     request: Request,
-    page: int = 1, per: int = 25,
+    page: int = 1,
+    per: int = 25,
     q: Optional[str] = None,
     make_id: Optional[str] = None,
-    model_id: Optional[str] = None,
+    car_model_id: Optional[str] = Query(None, alias="model_id"),
     category_id: Optional[str] = None,
     status: Optional[str] = None,
     year_min: Optional[str] = None,
@@ -214,7 +216,7 @@ def admin_cars(
     _=Depends(admin_session_required),
 ):
     make_id = _maybe_int(make_id)
-    model_id = _maybe_int(model_id)
+    model_id = _maybe_int(car_model_id)
     category_id = _maybe_int(category_id)
     year_min = _maybe_int(year_min)
     year_max = _maybe_int(year_max)
@@ -251,13 +253,30 @@ def admin_cars(
             text(f"SELECT * FROM cars WHERE {where_sql} ORDER BY {sort_col} DESC LIMIT :per OFFSET :off").bindparams(**(dict(args, per=per, off=off)))).mappings().all()
     last_page = max(1, (total + per - 1)//per)
     t = csrf_token(request)
-    resp = templates.TemplateResponse("admin_cars.html", {
-        "request": request, "cars": rows, "q": q or "", "make_id": make_id, "model_id": model_id, "category_id": category_id, "status": status or "",
-        "year_min": year_min, "year_max": year_max, "sort": sort_col, "per": per,
-        "makes": makes, "models": models, "categories": categories,
-        "page": page, "last_page": last_page, "total": total, "title":"Cars",
-        "flash": pop_flash(request)
-    })
+    resp = templates.TemplateResponse(
+        request,
+        "admin_cars.html",
+        {
+            "cars": rows,
+            "q": q or "",
+            "make_id": make_id,
+            "model_id": model_id,
+            "category_id": category_id,
+            "status": status or "",
+            "year_min": year_min,
+            "year_max": year_max,
+            "sort": sort_col,
+            "per": per,
+            "makes": makes,
+            "models": models,
+            "categories": categories,
+            "page": page,
+            "last_page": last_page,
+            "total": total,
+            "title": "Cars",
+            "flash": pop_flash(request),
+        },
+    )
     return resp
 
 @app.get("/admin/cars/new", response_class=HTMLResponse)
@@ -268,9 +287,9 @@ def admin_car_new(request: Request, _=Depends(admin_session_required)):
         models = s.exec(select(Model).order_by(Model.name)).all()
         categories = s.exec(select(Category).order_by(Category.name)).all()
     resp = templates.TemplateResponse(
+        request,
         "admin_car_edit.html",
         {
-            "request": request,
             "car": None,
             "action": "/admin/cars/new",
             "title": "New Car",
@@ -287,7 +306,7 @@ def admin_car_new(request: Request, _=Depends(admin_session_required)):
 def admin_car_create(
     request: Request,
     csrf: str = Form(...),
-    vin: str = Form(None), year: int = Form(None), make_id: int = Form(None), model_id: int = Form(None), category_id: int = Form(None), trim: str = Form(None),
+    vin: str = Form(None), year: int = Form(None), make_id: int = Form(None), car_model_id: int = Form(None, alias="model_id"), category_id: int = Form(None), trim: str = Form(None),
     price: float = Form(None), mileage: int = Form(None), currency: str = Form("USD"),
     city: str = Form(None), state: str = Form(None),
     auction_status: str = Form(None), lot_number: str = Form(None), source: str = Form(None),
@@ -300,8 +319,8 @@ def admin_car_create(
     allowed = set(Car.model_fields.keys())
     with DBSession(engine) as s:
         make_name = s.get(Make, make_id).name if make_id else None
-        model_name = s.get(Model, model_id).name if model_id else None
-        payload = {k:v for k,v in dict(vin=vin, year=year, make=make_name, make_id=make_id, model=model_name, model_id=model_id, category_id=category_id,
+        model_name = s.get(Model, car_model_id).name if car_model_id else None
+        payload = {k:v for k,v in dict(vin=vin, year=year, make=make_name, make_id=make_id, model=model_name, model_id=car_model_id, category_id=category_id,
                                        trim=trim, price=price, mileage=mileage, currency=currency,
                                        city=city, state=state, auction_status=auction_status, lot_number=lot_number, source=source,
                                        url=url, title=title, image_url=image_url, description=description, seller_name=seller_name,
@@ -321,9 +340,9 @@ def admin_car_edit(request: Request, car_id: int, _=Depends(admin_session_requir
         categories = s.exec(select(Category).order_by(Category.name)).all()
     t = csrf_token(request)
     resp = templates.TemplateResponse(
+        request,
         "admin_car_edit.html",
         {
-            "request": request,
             "car": car,
             "action": f"/admin/cars/{car_id}",
             "title": f"Edit Car {car_id}",
@@ -340,7 +359,7 @@ def admin_car_edit(request: Request, car_id: int, _=Depends(admin_session_requir
 def admin_car_update(
     request: Request, car_id: int,
     csrf: str = Form(...),
-    vin: str = Form(None), year: int = Form(None), make_id: int = Form(None), model_id: int = Form(None), category_id: int = Form(None), trim: str = Form(None),
+    vin: str = Form(None), year: int = Form(None), make_id: int = Form(None), car_model_id: int = Form(None, alias="model_id"), category_id: int = Form(None), trim: str = Form(None),
     price: float = Form(None), mileage: int = Form(None), currency: str = Form("USD"),
     city: str = Form(None), state: str = Form(None),
     auction_status: str = Form(None), lot_number: str = Form(None), source: str = Form(None),
@@ -353,8 +372,8 @@ def admin_car_update(
     allowed = set(Car.model_fields.keys())
     with DBSession(engine) as s:
         make_name = s.get(Make, make_id).name if make_id else None
-        model_name = s.get(Model, model_id).name if model_id else None
-        payload = {k:v for k,v in dict(vin=vin, year=year, make=make_name, make_id=make_id, model=model_name, model_id=model_id, category_id=category_id,
+        model_name = s.get(Model, car_model_id).name if car_model_id else None
+        payload = {k:v for k,v in dict(vin=vin, year=year, make=make_name, make_id=make_id, model=model_name, model_id=car_model_id, category_id=category_id,
                                        trim=trim, price=price, mileage=mileage, currency=currency,
                                        city=city, state=state, auction_status=auction_status, lot_number=lot_number, source=source,
                                        url=url, title=title, image_url=image_url, description=description, seller_name=seller_name,
@@ -374,7 +393,7 @@ def admin_car_delete(request: Request, car_id: int, _=Depends(admin_session_requ
         car = s.get(Car, car_id)
         if car:
             before = car.model_dump() if hasattr(car,"model_dump") else None
-            car.deleted_at = datetime.utcnow().isoformat()
+            car.deleted_at = datetime.now(timezone.utc).isoformat()
             s.add(car); s.commit()
             audit(request.session.get("admin_user","admin"), "delete", "cars", car_id, before, {"deleted_at": car.deleted_at}, get_ip(request))
     flash(request, "Car deleted", "success")
@@ -391,7 +410,7 @@ def admin_cars_bulk(request: Request, csrf: str = Form(...), ids: str = Form(...
     lambda _ids: (
         (lambda _sql, _params: s.exec(text(_sql).bindparams(**_params)))(
             "UPDATE cars SET deleted_at=:ts WHERE id IN (" + ",".join([f":id{i}" for i,_ in enumerate(_ids)]) + ")",
-            dict({"ts": datetime.utcnow().isoformat()}, **{f"id{i}": v for i,v in enumerate(_ids)})
+            dict({"ts": datetime.now(timezone.utc).isoformat()}, **{f"id{i}": v for i,v in enumerate(_ids)})
         )
     )
 )(id_list)
@@ -458,9 +477,9 @@ def admin_imports(request: Request, _=Depends(admin_session_required)):
             text("SELECT * FROM import_jobs ORDER BY created DESC")
         ).mappings().all()
     return templates.TemplateResponse(
+        request,
         "admin_imports.html",
         {
-            "request": request,
             "jobs": jobs,
             "title": "Imports",
             "csrf": csrf_token(request),
@@ -479,7 +498,7 @@ def admin_imports_run(
     require_csrf(request, csrf)
     with DBSession(engine) as s:
         job = ImportJob(
-            source=source, status="queued", created=datetime.utcnow().isoformat()
+            source=source, status="queued", created=datetime.now(timezone.utc).isoformat()
         )
         s.add(job)
         s.commit()
@@ -494,9 +513,9 @@ def admin_import_detail(request: Request, id: int, _=Depends(admin_session_requi
     if not job:
         raise HTTPException(status_code=404)
     return templates.TemplateResponse(
+        request,
         "admin_import_detail.html",
         {
-            "request": request,
             "job": job,
             "title": f"Import {id}",
             "csrf": csrf_token(request),
@@ -521,7 +540,7 @@ def admin_import_cancel(
             flash(request, "Job cannot be cancelled", "error")
         else:
             job.status = "cancelled"
-            job.finished_at = datetime.utcnow().isoformat()
+            job.finished_at = datetime.now(timezone.utc).isoformat()
             job.cancellable = False
             s.add(job)
             s.commit()
@@ -536,9 +555,9 @@ def admin_settings(request: Request, _=Depends(admin_session_required)):
     data = {r["key"]: r["value"] for r in rows}
     t = csrf_token(request)
     resp = templates.TemplateResponse(
+        request,
         "admin_settings.html",
         {
-            "request": request,
             "settings": data,
             "title": "Settings",
             "csrf": csrf_token(request),
@@ -610,9 +629,9 @@ async def admin_login(request: Request):
     token = _get_csrf_from_form(form)
     if token != request.session.get("csrf_token"):
         return templates.TemplateResponse(
+            request,
             "admin_login.html",
             {
-                "request": request,
                 "title": "Login",
                 "error": "CSRF token invalid",
                 "csrf": csrf_token(request),
@@ -629,9 +648,9 @@ async def admin_login(request: Request):
         return RedirectResponse(url="/admin", status_code=303)
 
     return templates.TemplateResponse(
+        request,
         "admin_login.html",
         {
-            "request": request,
             "title": "Login",
             "error": "Invalid credentials",
             "csrf": csrf_token(request),

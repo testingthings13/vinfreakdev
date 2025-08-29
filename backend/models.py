@@ -1,5 +1,9 @@
 from typing import ClassVar
 from sqlmodel import SQLModel, Field
+from pydantic import ConfigDict, BaseModel
+
+# Allow "model_*" field names globally
+BaseModel.model_config["protected_namespaces"] = ()
 
 
 class Make(SQLModel, table=True):
@@ -24,6 +28,8 @@ class Category(SQLModel, table=True):
 # NOTE: Car columns mirror existing DB plus optional deleted_at for soft delete.
 class Car(SQLModel, table=True):
     __tablename__ = "cars"
+    # Allow field names that would otherwise clash with Pydantic protected namespaces
+    model_config = ConfigDict(protected_namespaces=())
     id: int | None = Field(default=None, primary_key=True)
     vin: str | None = None
     make: str | None = None
