@@ -1,7 +1,7 @@
 from secrets import token_urlsafe
 import hmac
 from fastapi import FastAPI, Request, Depends, Form, UploadFile, File, Response, HTTPException, Query
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
@@ -1059,17 +1059,9 @@ else:
     FRONTEND_INDEX = FRONTEND_BASE / "index.html"
 
 
-@app.get("/", response_class=HTMLResponse)
-def frontend_root():
+@app.get("/{full_path:path}", include_in_schema=False)
+async def spa_fallback(full_path: str):
     if FRONTEND_INDEX.exists():
         return FileResponse(FRONTEND_INDEX)
     raise HTTPException(status_code=404, detail="Frontend not built")
-
-
-@app.get("/{path_name:path}", response_class=HTMLResponse)
-def frontend_fallback(path_name: str, request: Request):
-    accept = request.headers.get("accept", "")
-    if "text/html" in accept and FRONTEND_INDEX.exists():
-        return FileResponse(FRONTEND_INDEX)
-    raise HTTPException(status_code=404, detail="Not found")
 
