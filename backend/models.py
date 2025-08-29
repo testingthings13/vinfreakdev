@@ -25,6 +25,13 @@ class Category(SQLModel, table=True):
     name: str
 
 
+class Dealership(SQLModel, table=True):
+    __tablename__ = "dealerships"
+    id: int | None = Field(default=None, primary_key=True)
+    name: str
+    logo_url: str | None = None
+
+
 # NOTE: Car columns mirror existing DB plus optional deleted_at for soft delete.
 class Car(SQLModel, table=True):
     __tablename__ = "cars"
@@ -56,6 +63,7 @@ class Car(SQLModel, table=True):
     seller_reviews: str | None = None
     posted_at: str | None = None
     deleted_at: str | None = None  # soft delete (TEXT ISO8601)
+    dealership_id: int | None = Field(default=None, foreign_key="dealerships.id")
 
 class Media(SQLModel, table=True):
     __tablename__ = "media"

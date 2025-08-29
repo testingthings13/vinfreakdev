@@ -43,7 +43,7 @@ sys.modules['sqlmodel'] = types.SimpleNamespace(
     create_engine=lambda *a, **k: None,
 )
 sys.modules['db'] = types.SimpleNamespace(engine=None, init_db=lambda: None)
-sys.modules['models'] = types.SimpleNamespace(Car=None, Media=None, ImportJob=None, Setting=None, AdminAudit=None)
+sys.modules['models'] = types.SimpleNamespace(Car=None, Media=None, ImportJob=None, Setting=None, AdminAudit=None, Dealership=None)
 
 # Ensure required directories and template
 (ROOT / "static").mkdir(exist_ok=True)
