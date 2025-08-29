@@ -14,6 +14,11 @@ const DEFAULT_BASE = (() => {
   return origin;
 })();
 
+// Final API base URL. Use VITE_API_BASE env var if provided at build time
+// (e.g. when the frontend is served from a different domain), otherwise
+// fall back to the origin-derived default above.
+const BASE = import.meta.env.VITE_API_BASE || DEFAULT_BASE;
+
 
 // Generic JSON fetch with timeout
 export async function getJSON(path, { timeoutMs = 12000 } = {}) {
