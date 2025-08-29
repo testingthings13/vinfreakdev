@@ -29,8 +29,7 @@ class Dealership(SQLModel, table=True):
     __tablename__ = "dealerships"
     id: int | None = Field(default=None, primary_key=True)
     name: str
-    logo: str | None = None  # stored filename in uploads/
-    cars: list["Car"] = Relationship(back_populates="dealership")
+
 
 
 # NOTE: Car columns mirror existing DB plus optional deleted_at for soft delete.
@@ -45,6 +44,7 @@ class Car(SQLModel, table=True):
     model: str | None = None
     model_id: int | None = Field(default=None, foreign_key="models.id")
     category_id: int | None = Field(default=None, foreign_key="categories.id")
+    dealership_id: int | None = Field(default=None, foreign_key="dealerships.id")
     trim: str | None = None
     year: int | None = None
     mileage: int | None = None
@@ -66,6 +66,9 @@ class Car(SQLModel, table=True):
     dealership_id: int | None = Field(default=None, foreign_key="dealerships.id")
     dealership: Dealership | None = Relationship(back_populates="cars")
     deleted_at: str | None = None  # soft delete (TEXT ISO8601)
+    dealership_id: int | None = Field(default=None, foreign_key="dealerships.id")
+
+    dealership: Dealership | None = Relationship(back_populates="cars")
 
 class Media(SQLModel, table=True):
     __tablename__ = "media"
