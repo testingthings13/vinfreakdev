@@ -1,4 +1,12 @@
-export default function Facets({ sort, setSort, minYear, setMinYear, maxYear, setMaxYear, source, setSource, sources }) {
+export default function Facets({
+  sort, setSort,
+  minYear, setMinYear,
+  maxYear, setMaxYear,
+  minPrice, setMinPrice,
+  maxPrice, setMaxPrice,
+  source, setSource,
+  sources
+}) {
   return (
     <div className="facets">
       <label className="f">
@@ -20,6 +28,14 @@ export default function Facets({ sort, setSort, minYear, setMinYear, maxYear, se
       <label className="f">
         <span>Max Year</span>
         <input type="number" value={maxYear ?? ""} onChange={e=>setMaxYear(e.target.value?Number(e.target.value):null)} />
+      </label>
+      <label className="f">
+        <span>Min Price</span>
+        <input type="number" value={minPrice ?? ""} onChange={e=>setMinPrice(e.target.value?Number(e.target.value):null)} />
+      </label>
+      <label className="f">
+        <span>Max Price</span>
+        <input type="number" value={maxPrice ?? ""} onChange={e=>setMaxPrice(e.target.value?Number(e.target.value):null)} />
       </label>
       <label className="f">
         <span>Source</span>

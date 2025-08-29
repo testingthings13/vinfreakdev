@@ -19,6 +19,8 @@ export default function Home() {
   const [sort, setSort] = useState("relevance");
   const [minYear, setMinYear] = useState(null);
   const [maxYear, setMaxYear] = useState(null);
+  const [minPrice, setMinPrice] = useState(null);
+  const [maxPrice, setMaxPrice] = useState(null);
   const [source, setSource] = useState("");
 
   const [page, setPage] = useState(1);
@@ -65,9 +67,13 @@ export default function Home() {
       return hay.includes(text);
     };
     const byYear = (c) => (minYear ? (c.__year ?? 0) >= minYear : true) && (maxYear ? (c.__year ?? 9999) <= maxYear : true);
+    const byPrice = (c) => {
+      const price = c.__price == null ? null : Number(c.__price);
+      return (minPrice ? (price ?? 0) >= minPrice : true) && (maxPrice ? (price ?? Infinity) <= maxPrice : true);
+    };
     const bySource = (c) => source ? String(c.__source || "") === source : true;
-    return raw.filter(c => byText(c) && byYear(c) && bySource(c));
-  }, [raw, q, minYear, maxYear, source]);
+    return raw.filter(c => byText(c) && byYear(c) && byPrice(c) && bySource(c));
+  }, [raw, q, minYear, maxYear, minPrice, maxPrice, source]);
 
   const sorted = useMemo(() => {
     const arr = [...filtered];
@@ -90,7 +96,7 @@ export default function Home() {
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const start = (page-1)*PAGE_SIZE;
   const pageItems = sorted.slice(start, start + PAGE_SIZE);
-  useEffect(()=>{ setPage(1); }, [q, minYear, maxYear, source, sort, PAGE_SIZE]);
+  useEffect(()=>{ setPage(1); }, [q, minYear, maxYear, minPrice, maxPrice, source, sort, PAGE_SIZE]);
 
   return (
     <div>
@@ -114,6 +120,8 @@ export default function Home() {
           sort={sort} setSort={setSort}
           minYear={minYear} setMinYear={setMinYear}
           maxYear={maxYear} setMaxYear={setMaxYear}
+          minPrice={minPrice} setMinPrice={setMinPrice}
+          maxPrice={maxPrice} setMaxPrice={setMaxPrice}
           source={source} setSource={setSource}
           sources={availableSources}
         />
@@ -121,6 +129,8 @@ export default function Home() {
           {q && <Chip label={`q: ${q}`} onClear={()=>setQ("")} />}
           {minYear!=null && <Chip label={`≥ ${minYear}`} onClear={()=>setMinYear(null)} />}
           {maxYear!=null && <Chip label={`≤ ${maxYear}`} onClear={()=>setMaxYear(null)} />}
+          {minPrice!=null && <Chip label={`≥ ${fmtMoney(minPrice)}`} onClear={()=>setMinPrice(null)} />}
+          {maxPrice!=null && <Chip label={`≤ ${fmtMoney(maxPrice)}`} onClear={()=>setMaxPrice(null)} />}
           {source && <Chip label={source} onClear={()=>setSource("")} />}
         </div>
         <div className="results">{fmtNum(total)} result{total===1?"":"s"}</div>
