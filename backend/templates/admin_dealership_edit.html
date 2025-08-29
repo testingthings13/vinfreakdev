@@ -1,0 +1,11 @@
+{% extends "_base.html" %}
+{% block content %}
+<h1>Edit Dealership</h1>
+<form class="form" action="/admin/dealerships/{{ dealership.id }}" method="post" enctype="multipart/form-data">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <label>Name <input type="text" name="name" value="{{ dealership.name }}" required></label>
+  <label>Logo <input type="file" name="logo"></label>
+  {% if dealership.logo_url %}<div class="preview"><img src="{{ dealership.logo_url }}" alt="logo" style="height:80px"></div>{% endif %}
+  <button type="submit">Save</button>
+</form>
+{% endblock %}

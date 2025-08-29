@@ -222,7 +222,7 @@ def get_car(id: str):
         if not car:
             car = s.exec(select(Car).where((Car.lot_number == id))).first()
         if not car or getattr(car, "deleted_at", None):
-            return {"detail": "Not found"}
+            raise HTTPException(status_code=404, detail="Not found")
         try:
             data = car.model_dump()
         except Exception:
@@ -274,6 +274,136 @@ def _maybe_int(val: Optional[str]) -> Optional[int]:
     except ValueError:
         return None
 
+# --- Dealership admin ---
+@app.get("/admin/dealerships", response_class=HTMLResponse)
+def admin_dealerships(request: Request, _=Depends(admin_session_required)):
+    with DBSession(engine) as s:
+        ds = s.exec(select(Dealership).order_by(Dealership.name)).all()
+    return templates.TemplateResponse(
+        request,
+        "admin_dealerships.html",
+        {
+            "dealerships": ds,
+            "csrf": csrf_token(request),
+            "title": "Dealerships",
+            "flash": pop_flash(request),
+        },
+    )
+
+@app.post("/admin/dealerships/new")
+def admin_dealership_create(
+    request: Request,
+    csrf: str = Form(...),
+    name: str = Form(...),
+    logo: UploadFile | None = File(None),
+    _=Depends(admin_session_required),
+):
+    require_csrf(request, csrf)
+    logo_url = None
+    if logo and getattr(logo, "filename", ""):
+        Path(settings.UPLOAD_DIR).mkdir(parents=True, exist_ok=True)
+        fname = f"{token_urlsafe(16)}_{logo.filename}"
+        path = Path(settings.UPLOAD_DIR) / fname
+        data = logo.file.read()
+        with open(path, "wb") as f:
+            f.write(data)
+        logo_url = f"/uploads/{fname}"
+    with DBSession(engine) as s:
+        d = Dealership(name=name, logo_url=logo_url)
+        s.add(d)
+        s.commit()
+        audit(
+            s,
+            request.session.get("admin_user", "admin"),
+            "create",
+            "dealerships",
+            d.id,
+            None,
+            {"name": name, "logo_url": logo_url},
+            get_ip(request),
+        )
+    flash(request, "Dealership added", "success")
+    return RedirectResponse("/admin/dealerships", status_code=303)
+
+@app.get("/admin/dealerships/{dealership_id}", response_class=HTMLResponse)
+def admin_dealership_edit(request: Request, dealership_id: int, _=Depends(admin_session_required)):
+    with DBSession(engine) as s:
+        d = s.get(Dealership, dealership_id)
+    if not d:
+        flash(request, "Dealership not found", "error")
+        return RedirectResponse("/admin/dealerships", status_code=303)
+    return templates.TemplateResponse(
+        request,
+        "admin_dealership_edit.html",
+        {
+            "dealership": d,
+            "csrf": csrf_token(request),
+            "title": "Edit Dealership",
+            "flash": pop_flash(request),
+        },
+    )
+
+@app.post("/admin/dealerships/{dealership_id}")
+def admin_dealership_update(
+    request: Request,
+    dealership_id: int,
+    csrf: str = Form(...),
+    name: str = Form(...),
+    logo: UploadFile | None = File(None),
+    _=Depends(admin_session_required),
+):
+    require_csrf(request, csrf)
+    with DBSession(engine) as s:
+        d = s.get(Dealership, dealership_id)
+        if not d:
+            flash(request, "Dealership not found", "error")
+            return RedirectResponse("/admin/dealerships", status_code=303)
+        before = d.model_dump() if hasattr(d, "model_dump") else {"name": d.name, "logo_url": d.logo_url}
+        d.name = name
+        if logo and getattr(logo, "filename", ""):
+            Path(settings.UPLOAD_DIR).mkdir(parents=True, exist_ok=True)
+            fname = f"{token_urlsafe(16)}_{logo.filename}"
+            path = Path(settings.UPLOAD_DIR) / fname
+            data = logo.file.read()
+            with open(path, "wb") as f:
+                f.write(data)
+            d.logo_url = f"/uploads/{fname}"
+        s.add(d)
+        s.commit()
+        audit(
+            s,
+            request.session.get("admin_user", "admin"),
+            "update",
+            "dealerships",
+            dealership_id,
+            before,
+            {"name": d.name, "logo_url": d.logo_url},
+            get_ip(request),
+        )
+    flash(request, "Dealership updated", "success")
+    return RedirectResponse("/admin/dealerships", status_code=303)
+
+@app.get("/admin/dealerships/{dealership_id}/delete")
+def admin_dealership_delete(request: Request, dealership_id: int, _=Depends(admin_session_required)):
+    with DBSession(engine) as s:
+        d = s.get(Dealership, dealership_id)
+        if d:
+            before = d.model_dump() if hasattr(d, "model_dump") else {"name": d.name, "logo_url": d.logo_url}
+            s.delete(d)
+            s.commit()
+            audit(
+                s,
+                request.session.get("admin_user", "admin"),
+                "delete",
+                "dealerships",
+                dealership_id,
+                before,
+                None,
+                get_ip(request),
+            )
+    flash(request, "Dealership deleted", "success")
+    return RedirectResponse("/admin/dealerships", status_code=303)
+
 @app.get("/admin/cars", response_class=HTMLResponse)
 def admin_cars(
     request: Request,
@@ -322,6 +452,7 @@ def admin_cars(
         makes = s.exec(select(Make).order_by(Make.name)).all()
         models = s.exec(select(Model).order_by(Model.name)).all()
         categories = s.exec(select(Category).order_by(Category.name)).all()
+        dealerships = s.exec(select(Dealership).order_by(Dealership.name)).all()
         total = s.exec(text(f"SELECT COUNT(*) AS c FROM cars WHERE {where_sql}").bindparams(**args)).first()[0]
         rows = s.exec(
             text(
@@ -349,6 +480,7 @@ def admin_cars(
             "makes": makes,
             "models": models,
             "categories": categories,
+            "dealerships": dealerships,
             "page": page,
             "last_page": last_page,
             "total": total,
@@ -422,6 +554,74 @@ def admin_car_create(
         )
         s.commit()
     flash(request, "Car created", "success")
+    return RedirectResponse("/admin/cars", status_code=303)
+
+# Bulk actions
+@app.post("/admin/cars/bulk")
+def admin_cars_bulk(
+    request: Request,
+    csrf: str = Form(...),
+    ids: str = Form(...),
+    action: str = Form(...),
+    dealership_id: int | None = Form(None),
+    _=Depends(admin_session_required),
+):
+    require_csrf(request, csrf)
+    id_list = [int(x) for x in ids.split(",") if x.strip().isdigit()]
+    with DBSession(engine) as s:
+        if action == "delete":
+            ts = datetime.now(timezone.utc).isoformat()
+            for cid in id_list:
+                car = s.get(Car, cid)
+                if car:
+                    before = car.model_dump() if hasattr(car, "model_dump") else None
+                    car.deleted_at = ts
+                    audit(
+                        s,
+                        request.session.get("admin_user", "admin"),
+                        "delete",
+                        "cars",
+                        cid,
+                        before,
+                        {"deleted_at": ts},
+                        get_ip(request),
+                    )
+            flash(request, f"Deleted {len(id_list)} car(s)", "success")
+        elif action in ("LIVE", "SOLD", "RESERVE_NOT_MET", "ENDED", "DRAFT"):
+            for cid in id_list:
+                car = s.get(Car, cid)
+                if car:
+                    before = {"auction_status": car.auction_status}
+                    car.auction_status = action
+                    audit(
+                        s,
+                        request.session.get("admin_user", "admin"),
+                        "update",
+                        "cars",
+                        cid,
+                        before,
+                        {"auction_status": action},
+                        get_ip(request),
+                    )
+            flash(request, f"Updated status for {len(id_list)} car(s)", "success")
+        elif action == "set_dealership" and dealership_id:
+            for cid in id_list:
+                car = s.get(Car, cid)
+                if car:
+                    before = {"dealership_id": car.dealership_id}
+                    car.dealership_id = dealership_id
+                    audit(
+                        s,
+                        request.session.get("admin_user", "admin"),
+                        "update",
+                        "cars",
+                        cid,
+                        before,
+                        {"dealership_id": dealership_id},
+                        get_ip(request),
+                    )
+            flash(request, f"Assigned {len(id_list)} car(s)", "success")
+        s.commit()
     return RedirectResponse("/admin/cars", status_code=303)
 
 @app.get("/admin/cars/{car_id}", response_class=HTMLResponse)
@@ -513,50 +713,6 @@ def admin_car_delete(request: Request, car_id: int, _=Depends(admin_session_requ
             s.add(car)
             s.commit()
     flash(request, "Car deleted", "success")
-    return RedirectResponse("/admin/cars", status_code=303)
-
-# Bulk actions
-@app.post("/admin/cars/bulk")
-def admin_cars_bulk(request: Request, csrf: str = Form(...), ids: str = Form(...), action: str = Form(...), _=Depends(admin_session_required)):
-    require_csrf(request, csrf)
-    id_list = [int(x) for x in ids.split(",") if x.strip().isdigit()]
-    with DBSession(engine) as s:
-        if action == "delete":
-            ts = datetime.now(timezone.utc).isoformat()
-            for cid in id_list:
-                car = s.get(Car, cid)
-                if car:
-                    before = car.model_dump() if hasattr(car, "model_dump") else None
-                    car.deleted_at = ts
-                    audit(
-                        s,
-                        request.session.get("admin_user", "admin"),
-                        "delete",
-                        "cars",
-                        cid,
-                        before,
-                        {"deleted_at": ts},
-                        get_ip(request),
-                    )
-            flash(request, f"Deleted {len(id_list)} car(s)", "success")
-        elif action in ("LIVE", "SOLD", "RESERVE_NOT_MET", "ENDED", "DRAFT"):
-            for cid in id_list:
-                car = s.get(Car, cid)
-                if car:
-                    before = {"auction_status": car.auction_status}
-                    car.auction_status = action
-                    audit(
-                        s,
-                        request.session.get("admin_user", "admin"),
-                        "update",
-                        "cars",
-                        cid,
-                        before,
-                        {"auction_status": action},
-                        get_ip(request),
-                    )
-            flash(request, f"Updated status for {len(id_list)} car(s)", "success")
-        s.commit()
     return RedirectResponse("/admin/cars", status_code=303)
 
 # Import/Export
