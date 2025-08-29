@@ -1067,3 +1067,9 @@ def frontend_root():
 
 
 
+@app.get("/{path_name:path}", response_class=HTMLResponse)
+def frontend_fallback(path_name: str):
+    if FRONTEND_INDEX.exists():
+        return HTMLResponse(FRONTEND_INDEX.read_text())
+    raise HTTPException(status_code=404, detail="Frontend not built")
+
