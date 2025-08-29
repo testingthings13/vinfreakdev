@@ -3,7 +3,7 @@ import { createContext, useEffect, useState } from "react";
 import Home from "./pages/Home";
 import CarDetail from "./pages/CarDetail";
 import ErrorBoundary from "./components/ErrorBoundary";
-import { getSettings } from "./api";
+import { getSettings, API_BASE } from "./api";
 import { useToast } from "./ToastContext";
 
 export const SettingsContext = createContext({
@@ -51,11 +51,12 @@ export default function App() {
         )}
         <header className="app-header">
           <Link to="/" className="logo">
-            {settings.logo_url ? (
-              <img src={settings.logo_url} alt={settings.site_title} />
-            ) : (
-              settings.site_title
-            )}
+            {(() => {
+              const u = settings.logo_url;
+              if (!u) return settings.site_title;
+              const src = u.startsWith("http") ? u : `${API_BASE}${u}`;
+              return <img src={src} alt={settings.site_title} />;
+            })()}
           </Link>
           <nav>
             <NavLink to="/" end className={({ isActive }) => (isActive ? "active" : "")}>Cars</NavLink>
