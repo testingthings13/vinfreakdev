@@ -60,6 +60,13 @@
     {% for s in ['LIVE','SOLD','RESERVE_NOT_MET','ENDED','DRAFT'] %}
       <option value="{{ s }}">Set Status: {{ s }}</option>
     {% endfor %}
+    <option value="set_dealership">Set Dealership</option>
+  </select>
+  <select name="dealership_id">
+    <option value="">-- choose dealership --</option>
+    {% for d in dealerships %}
+      <option value="{{ d.id }}">{{ d.name }}</option>
+    {% endfor %}
   </select>
   <button type="submit">Apply to selected</button>
 </form>

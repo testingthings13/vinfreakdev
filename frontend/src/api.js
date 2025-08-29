@@ -1,5 +1,12 @@
 // Unified API helper that supports both array and {items,total,...} responses
-const BASE = (import.meta.env.VITE_API_BASE ?? window.location.origin).replace(/\/+$/, "");
+const DEFAULT_BASE = (() => {
+  const orig = window.location.origin;
+  // If hosted on a split Render setup (frontend at -1 domain, backend without),
+  // rewrite the origin to point to the backend.
+  if (orig.match(/-1\.onrender\.com$/)) return orig.replace(/-1\.onrender\.com$/, ".onrender.com");
+  return orig;
+})();
+const BASE = (import.meta.env.VITE_API_BASE ?? DEFAULT_BASE).replace(/\/+$/, "");
 
 // Generic JSON fetch with timeout
 export async function getJSON(path, { timeoutMs = 12000 } = {}) {

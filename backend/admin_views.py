@@ -57,6 +57,19 @@ class CarAdmin(ModelView, model=Car):
         }
     }
 
+    def _normalize_ids(self, data: dict) -> None:
+        for key in ("make_id", "model_id", "category_id", "dealership_id"):
+            if data.get(key) in ("", None):
+                data[key] = None
+
+    async def insert_model(self, request, data):
+        self._normalize_ids(data)
+        return await super().insert_model(request, data)
+
+    async def update_model(self, request, pk, data):
+        self._normalize_ids(data)
+        return await super().update_model(request, pk, data)
+
     async def action_export_csv(self, ids: List[Any]) -> Response:
         if not ids:
             return PlainTextResponse("No rows selected.", status_code=400)
