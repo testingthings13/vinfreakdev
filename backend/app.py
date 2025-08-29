@@ -1,7 +1,7 @@
 from secrets import token_urlsafe
 import hmac
 from fastapi import FastAPI, Request, Depends, Form, UploadFile, File, Response, HTTPException, Query
-from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
@@ -1066,4 +1066,18 @@ def frontend_root():
     raise HTTPException(status_code=404, detail="Frontend not built")
 
 
+
+@app.get("/{path_name:path}", response_class=HTMLResponse)
+def frontend_fallback(path_name: str):
+    if FRONTEND_INDEX.exists():
+        return HTMLResponse(FRONTEND_INDEX.read_text())
+    raise HTTPException(status_code=404, detail="Frontend not built")
+
+
+@app.exception_handler(404)
+async def frontend_404_handler(request: Request, exc):
+    if request.method == "GET" and "text/html" in request.headers.get("accept", ""):
+        if FRONTEND_INDEX.exists():
+            return HTMLResponse(FRONTEND_INDEX.read_text())
+    return JSONResponse({"detail": "Not Found"}, status_code=404)
 
