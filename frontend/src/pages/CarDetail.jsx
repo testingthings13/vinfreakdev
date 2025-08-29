@@ -31,10 +31,15 @@ export default function CarDetail() {
         const data = await getJSON(`/cars/${encodeURIComponent(id)}`);
         setCar(data);
       } catch (e) {
-        addToast(String(e), "error");
+        try {
+          const alt = await getJSON(`/car/${encodeURIComponent(id)}`);
+          setCar(alt);
+        } catch (e2) {
+          addToast(String(e2), "error");
+        }
       } finally { setLoading(false); }
     })();
-  }, [id]);
+  }, [id, addToast]);
 
   const images = useMemo(()=> {
     if (!car) return [];

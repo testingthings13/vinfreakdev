@@ -130,6 +130,21 @@ def audit(
         )
     )
 
+
+def _to_int(value):
+    """Coerce form values to int or None.
+
+    HTML forms submit empty strings for unselected numeric fields which
+    causes Pydantic's integer parsing to fail. This helper gracefully
+    converts such values to ``None``.
+    """
+    try:
+        if value is None or value == "":
+            return None
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
 # --------- Auth views ----------
 @app.get("/admin/login")
 def admin_login_form(request: Request):
@@ -519,25 +534,29 @@ def admin_car_new(request: Request, _=Depends(admin_session_required)):
 def admin_car_create(
     request: Request,
     csrf: str = Form(...),
-    vin: str = Form(None), year: int = Form(None), make_id: int = Form(None), car_model_id: int = Form(None, alias="model_id"), category_id: int = Form(None), trim: str = Form(None),
+    vin: str = Form(None), year: int = Form(None), make_id: str | None = Form(None), car_model_id: str | None = Form(None, alias="model_id"), category_id: str | None = Form(None), trim: str = Form(None),
     price: float = Form(None), mileage: int = Form(None), currency: str = Form("USD"),
     city: str = Form(None), state: str = Form(None),
     auction_status: str = Form(None), lot_number: str = Form(None), source: str = Form(None),
     url: str = Form(None), title: str = Form(None), image_url: str = Form(None),
     description: str = Form(None), seller_name: str = Form(None), seller_rating: str = Form(None), seller_reviews: str = Form(None),
-    posted_at: str = Form(None), dealership_id: int = Form(None),
+    posted_at: str = Form(None), dealership_id: str | None = Form(None),
     _=Depends(admin_session_required),
 ):
     require_csrf(request, csrf)
     allowed = set(Car.model_fields.keys())
     with DBSession(engine) as s:
-        make_name = s.get(Make, make_id).name if make_id else None
-        model_name = s.get(Model, car_model_id).name if car_model_id else None
-        payload = {k:v for k,v in dict(vin=vin, year=year, make=make_name, make_id=make_id, model=model_name, model_id=car_model_id, category_id=category_id,
+        make_id_i = _to_int(make_id)
+        model_id_i = _to_int(car_model_id)
+        category_id_i = _to_int(category_id)
+        dealership_id_i = _to_int(dealership_id)
+        make_name = s.get(Make, make_id_i).name if make_id_i else None
+        model_name = s.get(Model, model_id_i).name if model_id_i else None
+        payload = {k:v for k,v in dict(vin=vin, year=year, make=make_name, make_id=make_id_i, model=model_name, model_id=model_id_i, category_id=category_id_i,
                                        trim=trim, price=price, mileage=mileage, currency=currency,
                                        city=city, state=state, auction_status=auction_status, lot_number=lot_number, source=source,
                                        url=url, title=title, image_url=image_url, description=description, seller_name=seller_name,
-                                       seller_rating=seller_rating, seller_reviews=seller_reviews, posted_at=posted_at, dealership_id=dealership_id).items() if k in allowed}
+                                       seller_rating=seller_rating, seller_reviews=seller_reviews, posted_at=posted_at, dealership_id=dealership_id_i).items() if k in allowed}
         c = Car(**payload)
         s.add(c)
         s.flush()
@@ -654,25 +673,29 @@ def admin_car_edit(request: Request, car_id: int, _=Depends(admin_session_requir
 def admin_car_update(
     request: Request, car_id: int,
     csrf: str = Form(...),
-    vin: str = Form(None), year: int = Form(None), make_id: int = Form(None), car_model_id: int = Form(None, alias="model_id"), category_id: int = Form(None), trim: str = Form(None),
+    vin: str = Form(None), year: int = Form(None), make_id: str | None = Form(None), car_model_id: str | None = Form(None, alias="model_id"), category_id: str | None = Form(None), trim: str = Form(None),
     price: float = Form(None), mileage: int = Form(None), currency: str = Form("USD"),
     city: str = Form(None), state: str = Form(None),
     auction_status: str = Form(None), lot_number: str = Form(None), source: str = Form(None),
     url: str = Form(None), title: str = Form(None), image_url: str = Form(None),
     description: str = Form(None), seller_name: str = Form(None), seller_rating: str = Form(None), seller_reviews: str = Form(None),
-    posted_at: str = Form(None), dealership_id: int = Form(None),
+    posted_at: str = Form(None), dealership_id: str | None = Form(None),
     _=Depends(admin_session_required),
 ):
     require_csrf(request, csrf)
     allowed = set(Car.model_fields.keys())
     with DBSession(engine) as s:
-        make_name = s.get(Make, make_id).name if make_id else None
-        model_name = s.get(Model, car_model_id).name if car_model_id else None
-        payload = {k:v for k,v in dict(vin=vin, year=year, make=make_name, make_id=make_id, model=model_name, model_id=car_model_id, category_id=category_id,
+        make_id_i = _to_int(make_id)
+        model_id_i = _to_int(car_model_id)
+        category_id_i = _to_int(category_id)
+        dealership_id_i = _to_int(dealership_id)
+        make_name = s.get(Make, make_id_i).name if make_id_i else None
+        model_name = s.get(Model, model_id_i).name if model_id_i else None
+        payload = {k:v for k,v in dict(vin=vin, year=year, make=make_name, make_id=make_id_i, model=model_name, model_id=model_id_i, category_id=category_id_i,
                                        trim=trim, price=price, mileage=mileage, currency=currency,
                                        city=city, state=state, auction_status=auction_status, lot_number=lot_number, source=source,
                                        url=url, title=title, image_url=image_url, description=description, seller_name=seller_name,
-                                       seller_rating=seller_rating, seller_reviews=seller_reviews, posted_at=posted_at, dealership_id=dealership_id).items() if k in allowed}
+                                       seller_rating=seller_rating, seller_reviews=seller_reviews, posted_at=posted_at, dealership_id=dealership_id_i).items() if k in allowed}
         car = s.get(Car, car_id)
         before = car.model_dump() if hasattr(car, "model_dump") else car.__dict__.copy()
         for k, v in payload.items():
@@ -1022,3 +1045,40 @@ def _admin_seed(request: Request, _=Depends(admin_session_required)):
             return PlainTextResponse(f"Seeded: {added} | Total cars now: {has + added}")
     except Exception as e:
         return PlainTextResponse(f"Seed error: {e}", status_code=500)
+
+
+# --------- Frontend fallback routes ---------
+FRONTEND_BASE = Path(__file__).resolve().parent.parent / "frontend"
+_dist_index = FRONTEND_BASE / "dist" / "index.html"
+if _dist_index.exists():
+    FRONTEND_INDEX = _dist_index
+    assets_dir = FRONTEND_INDEX.parent / "assets"
+    if assets_dir.exists():
+        app.mount("/assets", StaticFiles(directory=assets_dir), name="frontend_assets")
+else:
+    FRONTEND_INDEX = FRONTEND_BASE / "index.html"
+
+
+@app.get("/", response_class=HTMLResponse)
+def frontend_root():
+    if FRONTEND_INDEX.exists():
+        return HTMLResponse(FRONTEND_INDEX.read_text())
+    raise HTTPException(status_code=404, detail="Frontend not built")
+
+
+@app.get("/car/{car_id}")
+def frontend_car_page(car_id: str):
+    """Serve the SPA for direct car links or fall back to API JSON.
+
+    In environments where the compiled frontend assets are unavailable the
+    previously implemented behaviour returned a 404 which confused users
+    even though the car existed in the database. Instead, if the built
+    ``index.html`` cannot be found we simply return the same JSON payload as
+    the public ``/cars/{id}`` endpoint. When the SPA bundle is present the
+    route continues to deliver the HTML shell so the client side router can
+    render the page.
+    """
+    if FRONTEND_INDEX.exists():
+        return HTMLResponse(FRONTEND_INDEX.read_text())
+    # Fall back to the JSON API if no frontend is available
+    return get_car(car_id)
