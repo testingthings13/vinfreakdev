@@ -1,7 +1,7 @@
 // Unified API helper that supports both array and {items,total,...} responses
 const DEFAULT_BASE = (() => {
   const orig = window.location.origin;
-
+  return orig;
 })();
 
 // Allow an explicit VITE_API_BASE but fall back to DEFAULT_BASE for empty strings
