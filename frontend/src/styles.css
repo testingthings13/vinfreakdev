@@ -31,6 +31,13 @@ nav a.active{color:var(--accent);font-weight:700}
 .search{width:100%;padding:12px 14px;border-radius:12px;border:1px solid var(--border); background:rgba(8,12,26,.7); color:#fff; outline:none}
 .search:focus{box-shadow:0 0 0 3px #6ea8ff33;border-color:#6ea8ff66}
 
+.filters select:focus,
+.filters input:focus{
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent);
+  outline: none;
+}
+
 .toolbar-row{display:flex;flex-direction:column;gap:10px;margin:14px 0}
 .facets{display:flex;gap:10px;flex-wrap:wrap}
 .f{display:flex;flex-direction:column;gap:6px}
