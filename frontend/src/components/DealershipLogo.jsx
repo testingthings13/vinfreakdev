@@ -1,16 +1,21 @@
+import { API_BASE } from "../api";
+
 export default function DealershipLogo({ dealership }) {
   if (!dealership || !dealership.logo_url) return null;
-  const url = dealership.logo_url.startsWith('http')
-    ? dealership.logo_url
-    : dealership.logo_url.startsWith('/')
-      ? dealership.logo_url
-      : `/logos/${dealership.logo_url}`;
+  let url = dealership.logo_url;
+  if (url.startsWith("http")) {
+    // use as-is
+  } else if (url.startsWith("/")) {
+    url = `${API_BASE}${url}`;
+  } else {
+    url = `/logos/${url}`;
+  }
   return (
     <img
       className="dealership-logo"
       src={url}
-      alt={dealership.name || 'dealership'}
-      title={dealership.name || ''}
+      alt={dealership.name || "dealership"}
+      title={dealership.name || ""}
     />
   );
 }

@@ -582,11 +582,12 @@ def admin_cars_bulk(
     csrf: str = Form(...),
     ids: str = Form(...),
     action: str = Form(...),
-    dealership_id: int | None = Form(None),
+    dealership_id: str | None = Form(None),
     _=Depends(admin_session_required),
 ):
     require_csrf(request, csrf)
     id_list = [int(x) for x in ids.split(",") if x.strip().isdigit()]
+    dealership_id_i = _to_int(dealership_id)
     with DBSession(engine) as s:
         if action == "delete":
             ts = datetime.now(timezone.utc).isoformat()
@@ -623,12 +624,12 @@ def admin_cars_bulk(
                         get_ip(request),
                     )
             flash(request, f"Updated status for {len(id_list)} car(s)", "success")
-        elif action == "set_dealership" and dealership_id:
+        elif action == "set_dealership" and dealership_id_i:
             for cid in id_list:
                 car = s.get(Car, cid)
                 if car:
                     before = {"dealership_id": car.dealership_id}
-                    car.dealership_id = dealership_id
+                    car.dealership_id = dealership_id_i
                     audit(
                         s,
                         request.session.get("admin_user", "admin"),
@@ -636,7 +637,7 @@ def admin_cars_bulk(
                         "cars",
                         cid,
                         before,
-                        {"dealership_id": dealership_id},
+                        {"dealership_id": dealership_id_i},
                         get_ip(request),
                     )
             flash(request, f"Assigned {len(id_list)} car(s)", "success")

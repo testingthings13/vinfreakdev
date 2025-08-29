@@ -22,6 +22,7 @@ const DEFAULT_BASE = (() => {
 // (e.g. when the frontend is served from a different domain), otherwise
 // fall back to the origin-derived default above.
 const BASE = import.meta.env.VITE_API_BASE || DEFAULT_BASE;
+export const API_BASE = BASE;
 
 
 // Generic JSON fetch with timeout
