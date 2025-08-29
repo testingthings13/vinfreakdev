@@ -14,8 +14,6 @@ const DEFAULT_BASE = (() => {
   return origin;
 })();
 
-// Allow an explicit VITE_API_BASE but fall back to DEFAULT_BASE when unset or blank
-const BASE = (import.meta.env.VITE_API_BASE?.trim() || DEFAULT_BASE).replace(/\/+$/, "");
 
 // Generic JSON fetch with timeout
 export async function getJSON(path, { timeoutMs = 12000 } = {}) {
