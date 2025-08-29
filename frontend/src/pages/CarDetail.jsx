@@ -3,6 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import { getJSON } from "../api";
 import Gallery from "../components/Gallery";
 import SourceLogo from "../components/SourceLogo";
+import DealershipLogo from "../components/DealershipLogo";
 import { fmtMoney, fmtNum, fmtDate, toList } from "../utils/text";
 import { useToast } from "../ToastContext";
 
@@ -83,6 +84,7 @@ export default function CarDetail() {
           <h1>{title}</h1>
           <div className="hero-meta">
             {car.auction_status?.toUpperCase()==="SOLD" && <span className="ribbon sm">SOLD</span>}
+            {car.dealership && <DealershipLogo dealership={car.dealership} />}
             {!sourceHidden && <SourceLogo source={car.source} />}
           </div>
         </div>

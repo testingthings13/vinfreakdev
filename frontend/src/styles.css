@@ -53,6 +53,7 @@ nav a.active{color:var(--accent);font-weight:700}
 .card-head{display:flex;align-items:start;gap:10px}
 .ctitle{text-decoration:none;font-weight:800}
 .meta{margin-left:auto;display:flex;align-items:center;gap:6px}
+.hero-meta{display:flex;align-items:center;gap:6px}
 .source-logo{width:22px;height:22px;object-fit:contain;display:block}
 .dealership-logo{width:40px;height:40px;object-fit:cover;display:block;border-radius:50%}
 
