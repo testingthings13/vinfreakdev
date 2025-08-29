@@ -1074,10 +1074,3 @@ def frontend_fallback(path_name: str):
     raise HTTPException(status_code=404, detail="Frontend not built")
 
 
-@app.exception_handler(404)
-async def frontend_404_handler(request: Request, exc):
-    if request.method == "GET" and "text/html" in request.headers.get("accept", ""):
-        if FRONTEND_INDEX.exists():
-            return HTMLResponse(FRONTEND_INDEX.read_text())
-    return JSONResponse({"detail": "Not Found"}, status_code=404)
-
