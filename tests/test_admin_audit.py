@@ -27,7 +27,7 @@ def _init_db():
 sys.modules['db'] = types.SimpleNamespace(engine=engine, init_db=_init_db)
 import backend.models as real_models
 sys.modules['models'] = real_models
-from backend.models import Car, AdminAudit
+from backend.models import Car, AdminAudit, Dealership
 
 if 'backend.app' in sys.modules:
     del sys.modules['backend.app']
@@ -51,6 +51,11 @@ class DummyRequest:
 
 def test_audit_on_car_create_update_delete():
     _init_db()
+    with Session(engine) as s:
+        d = Dealership(name='Dealer One')
+        s.add(d)
+        s.commit()
+        did = d.id
     req = DummyRequest()
     resp = app_module.admin_car_create(
         req,
@@ -77,6 +82,7 @@ def test_audit_on_car_create_update_delete():
         seller_rating=None,
         seller_reviews=None,
         posted_at=None,
+        dealership_id=None,
         _=True,
     )
     assert resp.status_code == 303
@@ -113,12 +119,13 @@ def test_audit_on_car_create_update_delete():
         seller_rating=None,
         seller_reviews=None,
         posted_at=None,
+        dealership_id=did,
         _=True,
     )
     assert resp.status_code == 303
     with Session(engine) as s:
         audit = s.exec(select(AdminAudit).where(AdminAudit.action == 'update', AdminAudit.row_id == str(cid))).first()
-        assert audit is not None and 'New Title' in (audit.after_json or '')
+        assert audit is not None and 'New Title' in (audit.after_json or '') and 'dealership_id' in (audit.after_json or '')
 
     req = DummyRequest()
     resp = app_module.admin_car_delete(req, cid, _=True)
