@@ -1,4 +1,4 @@
-export default function SortFilterBar({ sort, setSort, minYear, setMinYear, maxYear, setMaxYear, source, setSource }) {
+export default function SortFilterBar({ sort, setSort, minYear, setMinYear, maxYear, setMaxYear, dealershipId, setDealershipId, dealerships = [] }) {
   return (
     <div className="filters">
       <label className="field">
@@ -25,8 +25,13 @@ export default function SortFilterBar({ sort, setSort, minYear, setMinYear, maxY
       </label>
 
       <label className="field">
-        <span>Source</span>
-        <input placeholder="e.g. carsandbids" value={source} onChange={e => setSource(e.target.value)} />
+        <span>Dealership</span>
+        <select value={dealershipId} onChange={e => setDealershipId(e.target.value)}>
+          <option value="">All</option>
+          {dealerships.map((d) => (
+            <option key={d.id} value={d.id}>{d.name}</option>
+          ))}
+        </select>
       </label>
     </div>
   );

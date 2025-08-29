@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import SourceLogo from "./SourceLogo";
+import DealershipLogo from "./DealershipLogo";
 import Badge from "./Badge";
 import { fmtMoney, fmtNum } from "../utils/text";
 
@@ -18,6 +19,7 @@ export default function CarCard({ car }) {
         <div className="card-head">
           <Link to={`/car/${encodeURIComponent(id)}`} className="ctitle">{car.__title}</Link>
           <div className="meta">
+            {car.dealership && <DealershipLogo dealership={car.dealership} />}
             {!car.__sourceHidden && <SourceLogo source={car.__source} />}
           </div>
         </div>

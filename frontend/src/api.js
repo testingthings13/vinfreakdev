@@ -33,6 +33,11 @@ export function getSettings() {
   return getJSON("/public/settings");
 }
 
+// Fetch dealerships list
+export function getDealerships() {
+  return getJSON("/dealerships");
+}
+
 // Map filters -> URLSearchParams
 function toParams(filters = {}, paging = {}) {
   const p = new URLSearchParams();
