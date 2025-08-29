@@ -6,10 +6,16 @@
 //
 // Deployments that use a separate backend domain can override this by setting
 // the `VITE_API_BASE` environment variable at build time.
-const DEFAULT_BASE = window.location.origin;
+// Render deploys can host the frontend on a "-1" subdomain while the backend
+// lives on the root domain. Strip the suffix so API calls reach the backend.
+const DEFAULT_BASE = (() => {
+  let origin = window.location.origin;
+  origin = origin.replace(/-1(?=\.onrender\.com)/, "");
+  return origin;
+})();
 
 // Allow an explicit VITE_API_BASE but fall back to DEFAULT_BASE for empty strings
-const BASE = (import.meta.env.VITE_API_BASE || DEFAULT_BASE).replace(/\/+$/, "");
+const BASE = (import.meta.env.VITE_API_BASE ?? DEFAULT_BASE).replace(/\/+$/, "");
 
 // Generic JSON fetch with timeout
 export async function getJSON(path, { timeoutMs = 12000 } = {}) {
