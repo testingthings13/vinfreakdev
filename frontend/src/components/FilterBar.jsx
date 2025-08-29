@@ -43,19 +43,67 @@ export default function FilterBar({ initial = {}, onChange }) {
 
   return (
     <div className="filters">
-      <input placeholder="Search…" value={q} onChange={e=>setQ(e.target.value)} />
-      <input placeholder="VIN" value={vin} onChange={e=>setVin(e.target.value)} />
-      <input placeholder="Make" value={make} onChange={e=>setMake(e.target.value)} />
-      <input placeholder="Model" value={model} onChange={e=>setModel(e.target.value)} />
-      <input placeholder="Year min" value={yearMin} onChange={e=>setYearMin(e.target.value)} />
-      <input placeholder="Year max" value={yearMax} onChange={e=>setYearMax(e.target.value)} />
-      <input placeholder="Price min" value={priceMin} onChange={e=>setPriceMin(e.target.value)} />
-      <input placeholder="Price max" value={priceMax} onChange={e=>setPriceMax(e.target.value)} />
-      <select value={source} onChange={e=>setSource(e.target.value)}>
+      <input
+        aria-label="Search"
+        placeholder="Search…"
+        value={q}
+        onChange={e => setQ(e.target.value)}
+      />
+      <input
+        aria-label="VIN"
+        placeholder="VIN"
+        value={vin}
+        onChange={e => setVin(e.target.value)}
+      />
+      <input
+        aria-label="Make"
+        placeholder="Make"
+        value={make}
+        onChange={e => setMake(e.target.value)}
+      />
+      <input
+        aria-label="Model"
+        placeholder="Model"
+        value={model}
+        onChange={e => setModel(e.target.value)}
+      />
+      <input
+        aria-label="Year min"
+        placeholder="Year min"
+        value={yearMin}
+        onChange={e => setYearMin(e.target.value)}
+      />
+      <input
+        aria-label="Year max"
+        placeholder="Year max"
+        value={yearMax}
+        onChange={e => setYearMax(e.target.value)}
+      />
+      <input
+        aria-label="Price min"
+        placeholder="Price min"
+        value={priceMin}
+        onChange={e => setPriceMin(e.target.value)}
+      />
+      <input
+        aria-label="Price max"
+        placeholder="Price max"
+        value={priceMax}
+        onChange={e => setPriceMax(e.target.value)}
+      />
+      <select
+        aria-label="Source"
+        value={source}
+        onChange={e => setSource(e.target.value)}
+      >
         <option value="">Any source</option>
         <option value="carsandbids">Cars & Bids</option>
       </select>
-      <select value={sort} onChange={e=>setSort(e.target.value)}>
+      <select
+        aria-label="Sort"
+        value={sort}
+        onChange={e => setSort(e.target.value)}
+      >
         <option value="relevance">Sort: Relevance</option>
         <option value="price_asc">Sort: Price ↑</option>
         <option value="price_desc">Sort: Price ↓</option>
