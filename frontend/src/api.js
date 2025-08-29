@@ -1,9 +1,10 @@
 // Unified API helper that supports both array and {items,total,...} responses
 const DEFAULT_BASE = (() => {
   const orig = window.location.origin;
-  // If hosted on a split Render setup (frontend at -1 domain, backend without),
-  // rewrite the origin to point to the backend.
-  if (orig.match(/-1\.onrender\.com$/)) return orig.replace(/-1\.onrender\.com$/, ".onrender.com");
+  // If hosted on a split Render setup (frontend at -N domain, backend without),
+  // rewrite the origin to point to the backend by dropping the dash-number suffix.
+  const m = orig.match(/^(https?:\/\/[^/]+?)-\d+\.onrender\.com$/);
+  if (m) return `${m[1]}.onrender.com`;
   return orig;
 })();
 const BASE = (import.meta.env.VITE_API_BASE ?? DEFAULT_BASE).replace(/\/+$/, "");
