@@ -9,11 +9,13 @@ import Pagination from "../components/Pagination";
 import CarCard from "../components/CarCard";
 import SkeletonCard from "../components/SkeletonCard";
 import { SettingsContext } from "../App";
+import { useToast } from "../ToastContext";
 
 export default function Home() {
   const [raw, setRaw] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [hasError, setHasError] = useState(false);
+  const { addToast } = useToast();
 
   const [q, setQ] = useState("");
   const [sort, setSort] = useState("relevance");
@@ -36,7 +38,8 @@ export default function Home() {
         if (!Array.isArray(list)) throw new Error("Backend did not return an array at /cars.");
         setRaw(list.map(normalizeCar));
       } catch (e) {
-        setError(String(e));
+        setHasError(true);
+        addToast(String(e), "error");
       } finally {
         setLoading(false);
       }
@@ -139,9 +142,8 @@ export default function Home() {
       {/* Grid */}
       <section className="grid">
         {loading && Array.from({length:PAGE_SIZE}).map((_,i)=> <SkeletonCard key={i} />)}
-        {!loading && !error && pageItems.map(c => <CarCard key={c.__id} car={c} />)}
-        {!loading && !error && !total && <div className="state">No cars match your filters.</div>}
-        {!loading && error && <div className="state error">Error: {error}</div>}
+        {!loading && !hasError && pageItems.map(c => <CarCard key={c.__id} car={c} />)}
+        {!loading && !hasError && !total && <div className="state">No cars match your filters.</div>}
       </section>
 
       {!loading && total>PAGE_SIZE && (

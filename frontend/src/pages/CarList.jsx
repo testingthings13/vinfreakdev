@@ -6,13 +6,14 @@ import SearchBar from "../components/SearchBar";
 import SortFilterBar from "../components/SortFilterBar";
 import Pagination from "../components/Pagination";
 import CarCard from "../components/CarCard";
+import { useToast } from "../ToastContext";
 
 const PAGE_SIZE = 12;
 
 export default function CarList() {
   const [raw, setRaw] = useState([]);
-  const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const { addToast } = useToast();
 
   const [q, setQ] = useState("");
   const dq = useDebounce(q, 300);
@@ -34,7 +35,7 @@ export default function CarList() {
         if (!Array.isArray(list)) throw new Error("Backend did not return an array at /cars.");
         setRaw(list.map(normalizeCar));
       } catch (e) {
-        setError(String(e));
+        addToast(String(e), "error");
       } finally {
         setLoading(false);
       }
@@ -85,7 +86,6 @@ export default function CarList() {
   useEffect(() => { setPage(1); }, [dq, minYear, maxYear, source, sort]);
 
   if (loading) return <div className="state">Loading cars…</div>;
-  if (error) return <div className="state error">Error: {error}</div>;
 
   return (
     <div className="wrap">
