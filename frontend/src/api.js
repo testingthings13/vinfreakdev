@@ -1,9 +1,12 @@
 // Unified API helper that supports both array and {items,total,...} responses
-const DEFAULT_BASE = (() => {
-  const { protocol, hostname, port } = window.location;
-  const apiHost = hostname.replace(/-1(?=\.onrender\.com$)/, "");
-  return `${protocol}//${apiHost}${port ? ':' + port : ''}`;
-})();
+// Derive the backend base URL from the current origin by default. This keeps
+// API requests on the same host that served the frontend, which ensures that
+// deep links like `/car/123` work whether the frontend and backend are served
+// from the same domain or behind a reverse proxy.
+//
+// Deployments that use a separate backend domain can override this by setting
+// the `VITE_API_BASE` environment variable at build time.
+const DEFAULT_BASE = window.location.origin;
 
 // Allow an explicit VITE_API_BASE but fall back to DEFAULT_BASE for empty strings
 const BASE = (import.meta.env.VITE_API_BASE || DEFAULT_BASE).replace(/\/+$/, "");
