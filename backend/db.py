@@ -1,7 +1,15 @@
 from sqlmodel import create_engine, SQLModel, Session
 from sqlalchemy import text
 from backend_settings import settings
-from models import Make, Model, Category, Dealership
+from models import (
+    Car,
+    ImportJob,
+    Make,
+    Model,
+    Category,
+    Dealership,
+    Media,
+)
 
 
 
@@ -34,8 +42,19 @@ engine = create_engine(
 )
 
 def init_db():
-    # Create non-cars tables from metadata
-    SQLModel.metadata.create_all(engine, tables=[Make.__table__, Model.__table__, Category.__table__, Dealership.__table__])
+    # Create application tables if they don't exist yet
+    SQLModel.metadata.create_all(
+        engine,
+        tables=[
+            Car.__table__,
+            Media.__table__,
+            ImportJob.__table__,
+            Make.__table__,
+            Model.__table__,
+            Category.__table__,
+            Dealership.__table__,
+        ],
+    )
     ensure_columns()
     # --- ensure cars.lot_number exists for legacy DBs ---
     try:
