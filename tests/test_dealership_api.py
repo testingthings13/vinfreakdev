@@ -12,6 +12,7 @@ settings = types.SimpleNamespace(
     ADMIN_USER="admin",
     ADMIN_PASS="admin",
     DATABASE_URL="sqlite://",
+    ADMIN_DATABASE_URL="sqlite://",
     UPLOAD_DIR="uploads",
     SECRET_KEY="test",
 )
@@ -30,6 +31,7 @@ def _init_db():
     SQLModel.metadata.create_all(engine)
 
 sys.modules['db'] = types.SimpleNamespace(engine=engine, init_db=_init_db)
+sys.modules['admin_db'] = types.SimpleNamespace(engine=engine, init_db=_init_db)
 import backend.models as real_models
 sys.modules['models'] = real_models
 from backend.models import Car, Dealership
@@ -41,6 +43,8 @@ import backend.app as app_module
 app_module.engine = engine
 app_module.DBSession = Session
 app_module.init_db = _init_db
+app_module.admin_engine = engine
+app_module.init_admin_db = _init_db
 
 
 def _seed():

@@ -1,7 +1,15 @@
 from sqlmodel import create_engine, SQLModel, Session
 from sqlalchemy import text
 from backend_settings import settings
-from models import Make, Model, Category, Dealership
+from models import (
+    Car,
+    ImportJob,
+    Make,
+    Model,
+    Category,
+    Dealership,
+    Media,
+)
 
 
 
@@ -34,8 +42,19 @@ engine = create_engine(
 )
 
 def init_db():
-    # Create non-cars tables from metadata
-    SQLModel.metadata.create_all(engine, tables=[Make.__table__, Model.__table__, Category.__table__, Dealership.__table__])
+    # Create application tables if they don't exist yet
+    SQLModel.metadata.create_all(
+        engine,
+        tables=[
+            Car.__table__,
+            Media.__table__,
+            ImportJob.__table__,
+            Make.__table__,
+            Model.__table__,
+            Category.__table__,
+            Dealership.__table__,
+        ],
+    )
     ensure_columns()
     # --- ensure cars.lot_number exists for legacy DBs ---
     try:
@@ -57,12 +76,6 @@ def init_db():
     # ----------------------------------------------------
     with Session(engine) as s:
         # Ensure cars table has deleted_at column (soft delete)
-
-        # SQLite: add column if missing
-        s.exec(text("""
-            CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT);
-        """))
-        # Add deleted_at column if it doesn't exist
         pragma = s.exec(text("PRAGMA table_info(cars)")).mappings().all()
         cols = {r['name'] for r in pragma}
         if "deleted_at" not in cols:
@@ -74,19 +87,4 @@ def init_db():
         s.exec(text("CREATE INDEX IF NOT EXISTS idx_cars_model ON cars(model)"))
         s.exec(text("CREATE INDEX IF NOT EXISTS idx_cars_posted_at ON cars(posted_at)"))
         s.exec(text("CREATE INDEX IF NOT EXISTS idx_cars_status ON cars(auction_status)"))
-        s.commit()
-        # Default settings
-        defaults = {
-            "site_title": "Vinfreak",
-            "site_tagline": "Discover performance & provenance",
-            "theme": "dark",
-            "logo_url": "",
-            "contact_email": "",
-            "default_page_size": "12",
-            "maintenance_banner": "",
-        }
-        for k, v in defaults.items():
-            r = s.exec(text("SELECT key FROM settings WHERE key=:k").bindparams(k=k)).first()
-            if not r:
-                s.exec(text("INSERT INTO settings(key,value) VALUES (:k,:v)").bindparams(k=k, v=v))
         s.commit()
