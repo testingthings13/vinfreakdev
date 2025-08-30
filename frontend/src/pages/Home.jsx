@@ -1,5 +1,5 @@
 import { useContext, useEffect, useMemo, useState } from "react";
-import { getJSON, getDealerships } from "../api";
+import { getCars, getDealerships } from "../api";
 import { normalizeCar } from "../utils/normalizeCar";
 import { fmtNum, fmtMoney, fmtDate } from "../utils/text";
 import SearchBar from "../components/SearchBar";
@@ -25,25 +25,56 @@ export default function Home() {
   const [maxPrice, setMaxPrice] = useState(null);
   const [dealershipId, setDealershipId] = useState("");
   const [dealerships, setDealerships] = useState([]);
+  const [dealerMap, setDealerMap] = useState({});
+  const [total, setTotal] = useState(0);
 
   const [page, setPage] = useState(1);
   const settings = useContext(SettingsContext);
   const PAGE_SIZE = Number(settings.default_page_size) || 12;
+  // Load dealerships once
+  useEffect(() => {
+    (async () => {
+      try {
+        const dealerData = await getDealerships();
+        const dealerList = Array.isArray(dealerData)
+          ? dealerData
+          : dealerData.items || dealerData.results || [];
+        setDealerships(dealerList);
+        setDealerMap(Object.fromEntries(dealerList.map((d) => [d.id, d])));
+      } catch (e) {
+        setHasError(true);
+        addToast(String(e), "error");
+      }
+    })();
+  }, []);
 
+  // Load cars whenever filters/pagination change
   useEffect(() => {
     (async () => {
       try {
         setLoading(true);
-        const [carData, dealerData] = await Promise.all([
-          getJSON("/cars"),
-          getDealerships(),
-        ]);
-        const dealerList = Array.isArray(dealerData) ? dealerData : (dealerData.items || dealerData.results || []);
-        setDealerships(dealerList);
-        const dealerMap = Object.fromEntries(dealerList.map(d => [d.id, d]));
-        const list = Array.isArray(carData) ? carData : (carData.items || carData.results || []);
-        if (!Array.isArray(list)) throw new Error("Backend did not return an array at /cars.");
-        setRaw(list.map(c => ({ ...normalizeCar(c), dealership: dealerMap[c.dealership_id] })));
+        setHasError(false);
+        const carData = await getCars(
+          {
+            q: q || undefined,
+            sort,
+            yearMin: minYear || undefined,
+            yearMax: maxYear || undefined,
+            priceMin: minPrice || undefined,
+            priceMax: maxPrice || undefined,
+            dealershipId: dealershipId || undefined,
+          },
+          { page, pageSize: PAGE_SIZE }
+        );
+        const list = Array.isArray(carData.items)
+          ? carData.items
+          : Array.isArray(carData)
+          ? carData
+          : carData.results || [];
+        if (!Array.isArray(list))
+          throw new Error("Backend did not return an array at /cars.");
+        setRaw(list);
+        setTotal(carData.total || list.length);
       } catch (e) {
         setHasError(true);
         addToast(String(e), "error");
@@ -51,54 +82,21 @@ export default function Home() {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [q, sort, minYear, maxYear, minPrice, maxPrice, dealershipId, page, PAGE_SIZE]);
+
+  const cars = useMemo(
+    () => raw.map((c) => ({ ...normalizeCar(c), dealership: dealerMap[c.dealership_id] })),
+    [raw, dealerMap]
+  );
 
   const kpis = useMemo(() => {
-    if (!raw.length) return null;
-    const prices = raw.map(c => c.__price).filter(x => x!=null && !isNaN(Number(x)));
+    if (!cars.length && !total) return null;
+    const prices = cars.map(c => c.__price).filter(x => x!=null && !isNaN(Number(x)));
     const avg = prices.length ? (prices.reduce((a,b)=>a+Number(b),0)/prices.length) : null;
-    const latest = raw.reduce((acc, c) => acc || c.posted_at, null);
-    return { total: raw.length, avgPrice: avg, latest: latest };
-  }, [raw]);
+    const latest = cars.reduce((acc, c) => acc || c.posted_at, null);
+    return { total, avgPrice: avg, latest: latest };
+  }, [cars, total]);
 
-  const filtered = useMemo(() => {
-    const text = q.trim().toLowerCase();
-    const byText = (c) => {
-      if (!text) return true;
-      const hay = [
-        c.__title, c.__make, c.__model, c.__trim, c.__location, c.vin, c.lot_number, c.dealership?.name
-      ].filter(Boolean).join(" ").toLowerCase();
-      return hay.includes(text);
-    };
-    const byYear = (c) => (minYear ? (c.__year ?? 0) >= minYear : true) && (maxYear ? (c.__year ?? 9999) <= maxYear : true);
-    const byPrice = (c) => {
-      const price = c.__price == null ? null : Number(c.__price);
-      return (minPrice ? (price ?? 0) >= minPrice : true) && (maxPrice ? (price ?? Infinity) <= maxPrice : true);
-    };
-    const byDealer = (c) => dealershipId ? String(c.dealership?.id || "") === String(dealershipId) : true;
-    return raw.filter(c => byText(c) && byYear(c) && byPrice(c) && byDealer(c));
-  }, [raw, q, minYear, maxYear, minPrice, maxPrice, dealershipId]);
-
-  const sorted = useMemo(() => {
-    const arr = [...filtered];
-    const num = (v)=> (v==null||v===""||isNaN(Number(v))) ? Infinity : Number(v);
-    const numDesc = (v)=> (v==null||v===""||isNaN(Number(v))) ? -Infinity : Number(v);
-    switch (sort) {
-      case "price_asc": arr.sort((a,b)=> num(a.__price) - num(b.__price)); break;
-      case "price_desc": arr.sort((a,b)=> numDesc(b.__price) - numDesc(a.__price)); break;
-      case "year_desc": arr.sort((a,b)=> (b.__year ?? -Infinity) - (a.__year ?? -Infinity)); break;
-      case "year_asc": arr.sort((a,b)=> (a.__year ?? Infinity) - (b.__year ?? Infinity)); break;
-      case "mileage_asc": arr.sort((a,b)=> num(a.__mileage) - num(b.__mileage)); break;
-      case "mileage_desc": arr.sort((a,b)=> numDesc(b.__mileage) - numDesc(a.__mileage)); break;
-      case "relevance":
-      default: break;
-    }
-    return arr;
-  }, [filtered, sort]);
-
-  const total = sorted.length;
-  const start = (page-1)*PAGE_SIZE;
-  const pageItems = sorted.slice(start, start + PAGE_SIZE);
   useEffect(()=>{ setPage(1); }, [q, minYear, maxYear, minPrice, maxPrice, dealershipId, sort, PAGE_SIZE]);
 
   return (
@@ -147,8 +145,8 @@ export default function Home() {
       {/* Grid */}
       <section className="grid">
         {loading && Array.from({length:PAGE_SIZE}).map((_,i)=> <SkeletonCard key={i} />)}
-        {!loading && !hasError && pageItems.map(c => <CarCard key={c.__id} car={c} />)}
-        {!loading && !hasError && !total && <div className="state">No cars match your filters.</div>}
+        {!loading && !hasError && cars.map(c => <CarCard key={c.__id} car={c} />)}
+        {!loading && !hasError && !cars.length && <div className="state">No cars match your filters.</div>}
       </section>
 
       {!loading && total>PAGE_SIZE && (
