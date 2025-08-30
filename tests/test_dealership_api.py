@@ -86,3 +86,28 @@ def test_list_dealerships():
     deals = app_module.list_dealerships()
     names = {d["name"] for d in deals}
     assert names == {"Dealer1", "Dealer2"}
+
+
+def test_remove_logo_from_dealership():
+    d1_id, *_ = _seed()
+    upload_dir = ROOT / "uploads"
+    upload_dir.mkdir(exist_ok=True)
+    old = upload_dir / "old.png"
+    old.write_text("x")
+    with Session(engine) as s:
+        d = s.get(Dealership, d1_id)
+        d.logo_url = f"/uploads/{old.name}"
+        s.add(d)
+        s.commit()
+    req = types.SimpleNamespace(
+        session={"csrf_token": "tok", "admin_user": "admin"},
+        headers={},
+        client=types.SimpleNamespace(host="test"),
+    )
+    app_module.admin_dealership_update(
+        req, d1_id, csrf="tok", name="Dealer1", logo=None, remove_logo=True, _=True
+    )
+    with Session(engine) as s:
+        d = s.get(Dealership, d1_id)
+        assert d.logo_url is None
+    assert not old.exists()
