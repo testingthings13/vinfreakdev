@@ -34,6 +34,7 @@ def require_admin(
 
 import io, csv, json, os, secrets, time
 from db import engine, init_db
+from admin_db import engine as admin_engine, init_db as init_admin_db
 from models import Car, ImportJob, Setting, AdminAudit, Dealership
 try:
     from models import Make, Model, Category
@@ -69,6 +70,7 @@ except Exception:
 @app.on_event("startup")
 def on_start():
     init_db()
+    init_admin_db()
 
 # -------- helpers: auth/flash/csrf/audit ----------
 FAILED_LOGINS = {}  # ip -> [timestamps]
@@ -108,7 +110,6 @@ def require_csrf(request: Request, token: str):
         raise HTTPException(status_code=400, detail="CSRF token invalid")
 
 def audit(
-    session: DBSession,
     actor: str,
     action: str,
     table: str,
@@ -117,18 +118,20 @@ def audit(
     after: dict | None,
     ip: str,
 ):
-    session.add(
-        AdminAudit(
-            actor=actor,
-            action=action,
-            table_name=table,
-            row_id=str(row_id),
-            before_json=json.dumps(before, ensure_ascii=False) if before else None,
-            after_json=json.dumps(after, ensure_ascii=False) if after else None,
-            ip=ip,
-            created_at=datetime.now(timezone.utc).isoformat(),
+    with DBSession(admin_engine) as session:
+        session.add(
+            AdminAudit(
+                actor=actor,
+                action=action,
+                table_name=table,
+                row_id=str(row_id),
+                before_json=json.dumps(before, ensure_ascii=False) if before else None,
+                after_json=json.dumps(after, ensure_ascii=False) if after else None,
+                ip=ip,
+                created_at=datetime.now(timezone.utc).isoformat(),
+            )
         )
-    )
+        session.commit()
 
 
 def _to_int(value):
@@ -265,7 +268,7 @@ def list_dealerships():
 
 @app.get("/public/settings")
 def public_settings():
-    with DBSession(engine) as s:
+    with DBSession(admin_engine) as s:
         rows = s.exec(text("SELECT key,value FROM settings")).mappings().all()
         return {r["key"]: r["value"] for r in rows}
 
@@ -328,7 +331,6 @@ def admin_dealership_create(
         s.add(d)
         s.commit()
         audit(
-            s,
             request.session.get("admin_user", "admin"),
             "create",
             "dealerships",
@@ -399,7 +401,6 @@ def admin_dealership_update(
         s.add(d)
         s.commit()
         audit(
-            s,
             request.session.get("admin_user", "admin"),
             "update",
             "dealerships",
@@ -425,7 +426,6 @@ def admin_dealership_delete(request: Request, dealership_id: int, _=Depends(admi
             s.delete(d)
             s.commit()
             audit(
-                s,
                 request.session.get("admin_user", "admin"),
                 "delete",
                 "dealerships",
@@ -580,7 +580,6 @@ def admin_car_create(
         s.flush()
         after = c.model_dump() if hasattr(c, "model_dump") else payload
         audit(
-            s,
             request.session.get("admin_user", "admin"),
             "create",
             "cars",
@@ -610,54 +609,51 @@ def admin_cars_bulk(
         if action == "delete":
             ts = datetime.now(timezone.utc).isoformat()
             for cid in id_list:
-                car = s.get(Car, cid)
-                if car:
-                    before = car.model_dump() if hasattr(car, "model_dump") else None
-                    car.deleted_at = ts
-                    audit(
-                        s,
-                        request.session.get("admin_user", "admin"),
-                        "delete",
-                        "cars",
-                        cid,
-                        before,
-                        {"deleted_at": ts},
-                        get_ip(request),
-                    )
+                    car = s.get(Car, cid)
+                    if car:
+                        before = car.model_dump() if hasattr(car, "model_dump") else None
+                        car.deleted_at = ts
+                        audit(
+                            request.session.get("admin_user", "admin"),
+                            "delete",
+                            "cars",
+                            cid,
+                            before,
+                            {"deleted_at": ts},
+                            get_ip(request),
+                        )
             flash(request, f"Deleted {len(id_list)} car(s)", "success")
         elif action in ("LIVE", "SOLD", "RESERVE_NOT_MET", "ENDED", "DRAFT"):
             for cid in id_list:
-                car = s.get(Car, cid)
-                if car:
-                    before = {"auction_status": car.auction_status}
-                    car.auction_status = action
-                    audit(
-                        s,
-                        request.session.get("admin_user", "admin"),
-                        "update",
-                        "cars",
-                        cid,
-                        before,
-                        {"auction_status": action},
-                        get_ip(request),
-                    )
+                    car = s.get(Car, cid)
+                    if car:
+                        before = {"auction_status": car.auction_status}
+                        car.auction_status = action
+                        audit(
+                            request.session.get("admin_user", "admin"),
+                            "update",
+                            "cars",
+                            cid,
+                            before,
+                            {"auction_status": action},
+                            get_ip(request),
+                        )
             flash(request, f"Updated status for {len(id_list)} car(s)", "success")
         elif action == "set_dealership" and dealership_id_i:
             for cid in id_list:
-                car = s.get(Car, cid)
-                if car:
-                    before = {"dealership_id": car.dealership_id}
-                    car.dealership_id = dealership_id_i
-                    audit(
-                        s,
-                        request.session.get("admin_user", "admin"),
-                        "update",
-                        "cars",
-                        cid,
-                        before,
-                        {"dealership_id": dealership_id_i},
-                        get_ip(request),
-                    )
+                    car = s.get(Car, cid)
+                    if car:
+                        before = {"dealership_id": car.dealership_id}
+                        car.dealership_id = dealership_id_i
+                        audit(
+                            request.session.get("admin_user", "admin"),
+                            "update",
+                            "cars",
+                            cid,
+                            before,
+                            {"dealership_id": dealership_id_i},
+                            get_ip(request),
+                        )
             flash(request, f"Assigned {len(id_list)} car(s)", "success")
         s.commit()
     return RedirectResponse("/admin/cars", status_code=303)
@@ -720,7 +716,6 @@ def admin_car_update(
         for k, v in payload.items():
             setattr(car, k, v)
         audit(
-            s,
             request.session.get("admin_user", "admin"),
             "update",
             "cars",
@@ -743,7 +738,6 @@ def admin_car_delete(request: Request, car_id: int, _=Depends(admin_session_requ
             before = car.model_dump() if hasattr(car, "model_dump") else None
             car.deleted_at = datetime.now(timezone.utc).isoformat()
             audit(
-                s,
                 request.session.get("admin_user", "admin"),
                 "delete",
                 "cars",
@@ -794,7 +788,6 @@ async def admin_cars_import(request: Request, csrf: str = Form(...), file: Uploa
                 for k, v in data.items():
                     setattr(car, k, v)
                 audit(
-                    s,
                     request.session.get("admin_user", "admin"),
                     "update",
                     "cars",
@@ -809,7 +802,6 @@ async def admin_cars_import(request: Request, csrf: str = Form(...), file: Uploa
                 s.add(car)
                 s.flush()
                 audit(
-                    s,
                     request.session.get("admin_user", "admin"),
                     "create",
                     "cars",
@@ -858,7 +850,6 @@ def admin_imports_run(
         s.flush()
         after = job.model_dump() if hasattr(job, "model_dump") else job.__dict__.copy()
         audit(
-            s,
             request.session.get("admin_user", "admin"),
             "create",
             "import_jobs",
@@ -910,7 +901,6 @@ def admin_import_cancel(
             job.finished_at = datetime.now(timezone.utc).isoformat()
             job.cancellable = False
             audit(
-                s,
                 request.session.get("admin_user", "admin"),
                 "update",
                 "import_jobs",
@@ -931,7 +921,7 @@ def admin_import_cancel(
 # Settings
 @app.get("/admin/settings", response_class=HTMLResponse)
 def admin_settings(request: Request, _=Depends(admin_session_required)):
-    with DBSession(engine) as s:
+    with DBSession(admin_engine) as s:
         rows = s.exec(text("SELECT key,value FROM settings")).mappings().all()
     data = {r["key"]: r["value"] for r in rows}
     t = csrf_token(request)
@@ -976,7 +966,7 @@ async def admin_settings_save(
         "default_page_size": default_page_size,
         "maintenance_banner": maintenance_banner,
     }
-    with DBSession(engine) as s:
+    with DBSession(admin_engine) as s:
         before = {
             r["key"]: r["value"]
             for r in s.exec(text("SELECT key,value FROM settings")).mappings().all()
@@ -988,7 +978,6 @@ async def admin_settings_save(
                 ).bindparams(k=k, v=v)
             )
         audit(
-            s,
             request.session.get("admin_user", "admin"),
             "settings",
             "settings",
