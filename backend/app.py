@@ -1,7 +1,7 @@
 from secrets import token_urlsafe
 import hmac
 from fastapi import FastAPI, Request, Depends, Form, UploadFile, File, Response, HTTPException, Query
-from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
@@ -703,107 +703,6 @@ def admin_cars_bulk(
         s.commit()
     return RedirectResponse("/admin/cars", status_code=303)
 
-@app.get("/admin/cars/{car_id}", response_class=HTMLResponse)
-def admin_car_edit(request: Request, car_id: int, _=Depends(admin_session_required)):
-    with DBSession(engine) as s:
-        car = s.get(Car, car_id)
-        makes = s.exec(select(Make).order_by(Make.name)).all()
-        models = s.exec(select(Model).order_by(Model.name)).all()
-        categories = s.exec(select(Category).order_by(Category.name)).all()
-        dealerships = s.exec(select(Dealership).order_by(Dealership.name)).all()
-    images_text = ""
-    if car and getattr(car, "images_json", None):
-        try:
-            images_text = "\n".join(json.loads(car.images_json))
-        except Exception:
-            images_text = car.images_json
-    t = csrf_token(request)
-    resp = templates.TemplateResponse(
-        request,
-        "admin_car_edit.html",
-        {
-            "car": car,
-            "action": f"/admin/cars/{car_id}",
-            "title": f"Edit Car {car_id}",
-            "csrf": csrf_token(request),
-            "makes": makes,
-            "models": models,
-            "categories": categories,
-            "dealerships": dealerships,
-            "images_text": images_text,
-            "flash": pop_flash(request),
-        },
-    )
-    return resp
-
-@app.post("/admin/cars/{car_id}")
-def admin_car_update(
-    request: Request, car_id: int,
-    csrf: str = Form(...),
-    vin: str = Form(None), year: int = Form(None), make_id: str | None = Form(None), car_model_id: str | None = Form(None, alias="model_id"), category_id: str | None = Form(None), trim: str = Form(None),
-    price: float = Form(None), mileage: int = Form(None), currency: str = Form("USD"),
-    city: str = Form(None), state: str = Form(None),
-    auction_status: str = Form(None), lot_number: str = Form(None), source: str = Form(None),
-    url: str = Form(None), title: str = Form(None), image_url: str = Form(None), images_input: str = Form(None, alias="images_json"),
-    description: str = Form(None), seller_name: str = Form(None), seller_rating: str = Form(None), seller_reviews: str = Form(None),
-    posted_at: str = Form(None), dealership_id: str | None = Form(None),
-    _=Depends(admin_session_required),
-):
-    require_csrf(request, csrf)
-    allowed = set(Car.model_fields.keys())
-    with DBSession(engine) as s:
-        make_id_i = _to_int(make_id)
-        model_id_i = _to_int(car_model_id)
-        category_id_i = _to_int(category_id)
-        dealership_id_i = _to_int(dealership_id)
-        make_name = s.get(Make, make_id_i).name if make_id_i else None
-        model_name = s.get(Model, model_id_i).name if model_id_i else None
-        images_json = _parse_images_form(images_input)
-        payload = {k:v for k,v in dict(vin=vin, year=year, make=make_name, make_id=make_id_i, model=model_name, model_id=model_id_i, category_id=category_id_i,
-                                       trim=trim, price=price, mileage=mileage, currency=currency,
-                                       city=city, state=state, auction_status=auction_status, lot_number=lot_number, source=source,
-                                       url=url, title=title, image_url=image_url, images_json=images_json, description=description, seller_name=seller_name,
-                                       seller_rating=seller_rating, seller_reviews=seller_reviews, posted_at=posted_at, dealership_id=dealership_id_i).items() if k in allowed}
-        car = s.get(Car, car_id)
-        before = car.model_dump() if hasattr(car, "model_dump") else car.__dict__.copy()
-        for k, v in payload.items():
-            setattr(car, k, v)
-        audit(
-            request.session.get("admin_user", "admin"),
-            "update",
-            "cars",
-            car_id,
-            before,
-            payload,
-            get_ip(request),
-        )
-        s.add(car)
-        s.commit()
-    flash(request, "Car updated", "success")
-    return RedirectResponse("/admin/cars", status_code=303)
-
-@app.get("/admin/cars/{car_id}/delete")
-def admin_car_delete(request: Request, car_id: int, _=Depends(admin_session_required)):
-    # soft delete
-    with DBSession(engine) as s:
-        car = s.get(Car, car_id)
-        if car:
-            before = car.model_dump() if hasattr(car, "model_dump") else None
-            car.deleted_at = datetime.now(timezone.utc).isoformat()
-            audit(
-                request.session.get("admin_user", "admin"),
-                "delete",
-                "cars",
-                car_id,
-                before,
-                {"deleted_at": car.deleted_at},
-                get_ip(request),
-            )
-            s.add(car)
-            s.commit()
-    flash(request, "Car deleted", "success")
-    return RedirectResponse("/admin/cars", status_code=303)
-
 # Import/Export
 @app.get("/admin/cars/export")
 def admin_cars_export(fmt: str = "csv", _=Depends(admin_session_required)):
@@ -904,6 +803,106 @@ async def admin_cars_import(
     flash(request, f"Import done: {inserted} inserted, {skipped} skipped", "success")
     return RedirectResponse("/admin/cars", status_code=303)
 
+@app.get("/admin/cars/{car_id}", response_class=HTMLResponse)
+def admin_car_edit(request: Request, car_id: int, _=Depends(admin_session_required)):
+    with DBSession(engine) as s:
+        car = s.get(Car, car_id)
+        makes = s.exec(select(Make).order_by(Make.name)).all()
+        models = s.exec(select(Model).order_by(Model.name)).all()
+        categories = s.exec(select(Category).order_by(Category.name)).all()
+        dealerships = s.exec(select(Dealership).order_by(Dealership.name)).all()
+    images_text = ""
+    if car and getattr(car, "images_json", None):
+        try:
+            images_text = "\n".join(json.loads(car.images_json))
+        except Exception:
+            images_text = car.images_json
+    t = csrf_token(request)
+    resp = templates.TemplateResponse(
+        request,
+        "admin_car_edit.html",
+        {
+            "car": car,
+            "action": f"/admin/cars/{car_id}",
+            "title": f"Edit Car {car_id}",
+            "csrf": csrf_token(request),
+            "makes": makes,
+            "models": models,
+            "categories": categories,
+            "dealerships": dealerships,
+            "images_text": images_text,
+            "flash": pop_flash(request),
+        },
+    )
+    return resp
+
+@app.post("/admin/cars/{car_id}")
+def admin_car_update(
+    request: Request, car_id: int,
+    csrf: str = Form(...),
+    vin: str = Form(None), year: int = Form(None), make_id: str | None = Form(None), car_model_id: str | None = Form(None, alias="model_id"), category_id: str | None = Form(None), trim: str = Form(None),
+    price: float = Form(None), mileage: int = Form(None), currency: str = Form("USD"),
+    city: str = Form(None), state: str = Form(None),
+    auction_status: str = Form(None), lot_number: str = Form(None), source: str = Form(None),
+    url: str = Form(None), title: str = Form(None), image_url: str = Form(None), images_input: str = Form(None, alias="images_json"),
+    description: str = Form(None), seller_name: str = Form(None), seller_rating: str = Form(None), seller_reviews: str = Form(None),
+    posted_at: str = Form(None), dealership_id: str | None = Form(None),
+    _=Depends(admin_session_required),
+):
+    require_csrf(request, csrf)
+    allowed = set(Car.model_fields.keys())
+    with DBSession(engine) as s:
+        make_id_i = _to_int(make_id)
+        model_id_i = _to_int(car_model_id)
+        category_id_i = _to_int(category_id)
+        dealership_id_i = _to_int(dealership_id)
+        make_name = s.get(Make, make_id_i).name if make_id_i else None
+        model_name = s.get(Model, model_id_i).name if model_id_i else None
+        images_json = _parse_images_form(images_input)
+        payload = {k:v for k,v in dict(vin=vin, year=year, make=make_name, make_id=make_id_i, model=model_name, model_id=model_id_i, category_id=category_id_i,
+                                       trim=trim, price=price, mileage=mileage, currency=currency,
+                                       city=city, state=state, auction_status=auction_status, lot_number=lot_number, source=source,
+                                       url=url, title=title, image_url=image_url, images_json=images_json, description=description, seller_name=seller_name,
+                                       seller_rating=seller_rating, seller_reviews=seller_reviews, posted_at=posted_at, dealership_id=dealership_id_i).items() if k in allowed}
+        car = s.get(Car, car_id)
+        before = car.model_dump() if hasattr(car, "model_dump") else car.__dict__.copy()
+        for k, v in payload.items():
+            setattr(car, k, v)
+        audit(
+            request.session.get("admin_user", "admin"),
+            "update",
+            "cars",
+            car_id,
+            before,
+            payload,
+            get_ip(request),
+        )
+        s.add(car)
+        s.commit()
+    flash(request, "Car updated", "success")
+    return RedirectResponse("/admin/cars", status_code=303)
+
+@app.get("/admin/cars/{car_id}/delete")
+def admin_car_delete(request: Request, car_id: int, _=Depends(admin_session_required)):
+    # soft delete
+    with DBSession(engine) as s:
+        car = s.get(Car, car_id)
+        if car:
+            before = car.model_dump() if hasattr(car, "model_dump") else None
+            car.deleted_at = datetime.now(timezone.utc).isoformat()
+            audit(
+                request.session.get("admin_user", "admin"),
+                "delete",
+                "cars",
+                car_id,
+                before,
+                {"deleted_at": car.deleted_at},
+                get_ip(request),
+            )
+            s.add(car)
+            s.commit()
+    flash(request, "Car deleted", "success")
+    return RedirectResponse("/admin/cars", status_code=303)
 # Imports
 @app.get("/admin/imports", response_class=HTMLResponse)
 def admin_imports(request: Request, _=Depends(admin_session_required)):
