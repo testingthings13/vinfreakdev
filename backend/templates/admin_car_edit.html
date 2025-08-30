@@ -57,6 +57,9 @@
     <label>Source URL <input name="url" value="{{ car.url if car else '' }}"></label>
     <label>Title <input name="title" value="{{ car.title if car else '' }}"></label>
     <label>Main image URL <input name="image_url" value="{{ car.image_url if car else '' }}"></label>
+    <label>Additional image URLs
+      <textarea name="images_json" rows="3">{{ images_text if images_text else '' }}</textarea>
+    </label>
     <label>Posted At <input name="posted_at" value="{{ car.posted_at if car else '' }}" placeholder="YYYY-MM-DDThh:mm:ssZ"></label>
     <label>Seller Name <input name="seller_name" value="{{ car.seller_name if car else '' }}"></label>
     <label>Seller Rating <input name="seller_rating" value="{{ car.seller_rating if car else '' }}"></label>
