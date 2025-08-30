@@ -1,5 +1,5 @@
 import { useContext, useEffect, useMemo, useState } from "react";
-import { getJSON } from "../api";
+import { getJSON, getDealerships } from "../api";
 import { normalizeCar } from "../utils/normalizeCar";
 import { fmtNum, fmtMoney, fmtDate } from "../utils/text";
 import SearchBar from "../components/SearchBar";
@@ -23,7 +23,8 @@ export default function Home() {
   const [maxYear, setMaxYear] = useState(null);
   const [minPrice, setMinPrice] = useState(null);
   const [maxPrice, setMaxPrice] = useState(null);
-  const [source, setSource] = useState("");
+  const [dealershipId, setDealershipId] = useState("");
+  const [dealerships, setDealerships] = useState([]);
 
   const [page, setPage] = useState(1);
   const settings = useContext(SettingsContext);
@@ -33,10 +34,16 @@ export default function Home() {
     (async () => {
       try {
         setLoading(true);
-        const data = await getJSON("/cars");
-        const list = Array.isArray(data) ? data : (data.items || data.results || []);
+        const [carData, dealerData] = await Promise.all([
+          getJSON("/cars"),
+          getDealerships(),
+        ]);
+        const dealerList = Array.isArray(dealerData) ? dealerData : (dealerData.items || dealerData.results || []);
+        setDealerships(dealerList);
+        const dealerMap = Object.fromEntries(dealerList.map(d => [d.id, d]));
+        const list = Array.isArray(carData) ? carData : (carData.items || carData.results || []);
         if (!Array.isArray(list)) throw new Error("Backend did not return an array at /cars.");
-        setRaw(list.map(normalizeCar));
+        setRaw(list.map(c => ({ ...normalizeCar(c), dealership: dealerMap[c.dealership_id] })));
       } catch (e) {
         setHasError(true);
         addToast(String(e), "error");
@@ -54,18 +61,12 @@ export default function Home() {
     return { total: raw.length, avgPrice: avg, latest: latest };
   }, [raw]);
 
-  const availableSources = useMemo(() => {
-    const s = new Set();
-    for (const c of raw) if (c.__source) s.add(c.__source);
-    return Array.from(s).sort();
-  }, [raw]);
-
   const filtered = useMemo(() => {
     const text = q.trim().toLowerCase();
     const byText = (c) => {
       if (!text) return true;
       const hay = [
-        c.__title, c.__make, c.__model, c.__trim, c.__location, c.vin, c.lot_number
+        c.__title, c.__make, c.__model, c.__trim, c.__location, c.vin, c.lot_number, c.dealership?.name
       ].filter(Boolean).join(" ").toLowerCase();
       return hay.includes(text);
     };
@@ -74,9 +75,9 @@ export default function Home() {
       const price = c.__price == null ? null : Number(c.__price);
       return (minPrice ? (price ?? 0) >= minPrice : true) && (maxPrice ? (price ?? Infinity) <= maxPrice : true);
     };
-    const bySource = (c) => source ? String(c.__source || "") === source : true;
-    return raw.filter(c => byText(c) && byYear(c) && byPrice(c) && bySource(c));
-  }, [raw, q, minYear, maxYear, minPrice, maxPrice, source]);
+    const byDealer = (c) => dealershipId ? String(c.dealership?.id || "") === String(dealershipId) : true;
+    return raw.filter(c => byText(c) && byYear(c) && byPrice(c) && byDealer(c));
+  }, [raw, q, minYear, maxYear, minPrice, maxPrice, dealershipId]);
 
   const sorted = useMemo(() => {
     const arr = [...filtered];
@@ -96,10 +97,9 @@ export default function Home() {
   }, [filtered, sort]);
 
   const total = sorted.length;
-  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const start = (page-1)*PAGE_SIZE;
   const pageItems = sorted.slice(start, start + PAGE_SIZE);
-  useEffect(()=>{ setPage(1); }, [q, minYear, maxYear, minPrice, maxPrice, source, sort, PAGE_SIZE]);
+  useEffect(()=>{ setPage(1); }, [q, minYear, maxYear, minPrice, maxPrice, dealershipId, sort, PAGE_SIZE]);
 
   return (
     <div>
@@ -125,8 +125,8 @@ export default function Home() {
           maxYear={maxYear} setMaxYear={setMaxYear}
           minPrice={minPrice} setMinPrice={setMinPrice}
           maxPrice={maxPrice} setMaxPrice={setMaxPrice}
-          source={source} setSource={setSource}
-          sources={availableSources}
+          dealershipId={dealershipId} setDealershipId={setDealershipId}
+          dealerships={dealerships}
         />
         <div className="chips">
           {q && <Chip label={`q: ${q}`} onClear={()=>setQ("")} />}
@@ -134,7 +134,12 @@ export default function Home() {
           {maxYear!=null && <Chip label={`≤ ${maxYear}`} onClear={()=>setMaxYear(null)} />}
           {minPrice!=null && <Chip label={`≥ ${fmtMoney(minPrice)}`} onClear={()=>setMinPrice(null)} />}
           {maxPrice!=null && <Chip label={`≤ ${fmtMoney(maxPrice)}`} onClear={()=>setMaxPrice(null)} />}
-          {source && <Chip label={source} onClear={()=>setSource("")} />}
+          {dealershipId && (
+            <Chip
+              label={dealerships.find(d => String(d.id) === String(dealershipId))?.name || dealershipId}
+              onClear={() => setDealershipId("")}
+            />
+          )}
         </div>
         <div className="results">{fmtNum(total)} result{total===1?"":"s"}</div>
       </section>

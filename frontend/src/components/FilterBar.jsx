@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import useDebounce from "../utils/useDebounce.js";
 
-export default function FilterBar({ initial = {}, onChange }) {
+export default function FilterBar({ initial = {}, dealerships = [], onChange }) {
   const [q, setQ] = useState(initial.q || "");
   const [vin, setVin] = useState(initial.vin || "");
   const [make, setMake] = useState(initial.make || "");
@@ -10,7 +10,7 @@ export default function FilterBar({ initial = {}, onChange }) {
   const [yearMax, setYearMax] = useState(initial.yearMax || "");
   const [priceMin, setPriceMin] = useState(initial.priceMin || "");
   const [priceMax, setPriceMax] = useState(initial.priceMax || "");
-  const [source, setSource] = useState(initial.source || "");
+  const [dealershipId, setDealershipId] = useState(initial.dealershipId || "");
   const [sort, setSort] = useState(initial.sort || "relevance");
 
   const dq = useDebounce(q);
@@ -28,15 +28,15 @@ export default function FilterBar({ initial = {}, onChange }) {
       yearMax: yearMax ? Number(yearMax) : undefined,
       priceMin: priceMin ? Number(priceMin) : undefined,
       priceMax: priceMax ? Number(priceMax) : undefined,
-      source: source || undefined,
+      dealershipId: dealershipId || undefined,
       sort: sort || undefined,
     });
     // eslint-disable-next-line
-  }, [dq, dvin, dmake, dmodel, yearMin, yearMax, priceMin, priceMax, source, sort]);
+  }, [dq, dvin, dmake, dmodel, yearMin, yearMax, priceMin, priceMax, dealershipId, sort]);
 
   function clearAll() {
     setQ(""); setVin(""); setMake(""); setModel("");
-    setYearMin(""); setYearMax(""); setPriceMin(""); setPriceMax(""); setSource("");
+    setYearMin(""); setYearMax(""); setPriceMin(""); setPriceMax(""); setDealershipId("");
     setSort("relevance");
     onChange({});
   }
@@ -92,12 +92,14 @@ export default function FilterBar({ initial = {}, onChange }) {
         onChange={e => setPriceMax(e.target.value)}
       />
       <select
-        aria-label="Source"
-        value={source}
-        onChange={e => setSource(e.target.value)}
+        aria-label="Dealership"
+        value={dealershipId}
+        onChange={e => setDealershipId(e.target.value)}
       >
-        <option value="">Any source</option>
-        <option value="carsandbids">Cars & Bids</option>
+        <option value="">Any dealership</option>
+        {dealerships.map(d => (
+          <option key={d.id} value={d.id}>{d.name}</option>
+        ))}
       </select>
       <select
         aria-label="Sort"

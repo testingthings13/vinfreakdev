@@ -55,7 +55,7 @@ export default function CarList() {
     const byText = (c) => {
       if (!text) return true;
       const hay = [
-        c.__title, c.__make, c.__model, c.__trim, c.__location, c.vin, c.lot_number, c.__source
+        c.__title, c.__make, c.__model, c.__trim, c.__location, c.vin, c.lot_number, c.dealership?.name
       ].filter(Boolean).join(" ").toLowerCase();
       return hay.includes(text);
     };
