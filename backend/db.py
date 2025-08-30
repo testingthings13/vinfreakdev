@@ -88,3 +88,32 @@ def init_db():
         s.exec(text("CREATE INDEX IF NOT EXISTS idx_cars_posted_at ON cars(posted_at)"))
         s.exec(text("CREATE INDEX IF NOT EXISTS idx_cars_status ON cars(auction_status)"))
         s.commit()
+
+    # Populate with a demo record if empty so the UI isn't blank on first run
+    seed_demo_data()
+
+def seed_demo_data():
+    """Insert a placeholder dealership and car for fresh databases.
+
+    The application previously shipped with a pre-populated SQLite file.  When
+    that file was removed from version control, brand-new deployments showed an
+    empty site which confused users.  This helper seeds a tiny bit of data so
+    the UI has something to display on first run.  It is a no-op if any cars
+    already exist.
+    """
+    from sqlmodel import Session
+
+    with Session(engine) as s:
+        # If there are already cars, assume the database has real data.
+        if s.exec(text("SELECT 1 FROM cars LIMIT 1")).first():
+            return
+
+        d = Dealership(name="Demo Dealer", logo_url=None)
+        s.add(d)
+        s.commit()
+
+        car = Car(make="Demo", model="Car", year=2024, vin="DEMO123", dealership_id=d.id)
+        s.add(car)
+        s.commit()
+
+
