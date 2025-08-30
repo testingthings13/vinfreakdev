@@ -820,51 +820,61 @@ def admin_cars_export(fmt: str = "csv", _=Depends(admin_session_required)):
         for r in rows: w.writerow(dict(r))
     return StreamingResponse(io.BytesIO(buf.getvalue().encode("utf-8")), media_type="text/csv", headers={"Content-Disposition":"attachment; filename=cars.csv"})
 
+@app.get("/admin/cars/import")
+async def admin_cars_import_get():
+    return Response("Use POST with a JSON file.", status_code=405)
+
 @app.post("/admin/cars/import")
-async def admin_cars_import(request: Request, csrf: str = Form(...), file: UploadFile = File(...), _=Depends(admin_session_required)):
+async def admin_cars_import(
+    request: Request,
+    csrf: str = Form(...),
+    file: UploadFile = File(...),
+    _=Depends(admin_session_required),
+):
     require_csrf(request, csrf)
-    content = (await file.read()).decode("utf-8", errors="ignore")
-    rdr = csv.DictReader(io.StringIO(content))
-    inserted = updated = 0
-    cols = set(rdr.fieldnames or [])
-    keep = cols & set(Car.model_fields.keys())
+    content = await file.read()
+    try:
+        items = json.loads(content)
+    except Exception:
+        flash(request, "Invalid JSON file", "error")
+        return RedirectResponse("/admin/cars", status_code=303)
+    if not isinstance(items, list):
+        flash(request, "JSON must be an array of objects", "error")
+        return RedirectResponse("/admin/cars", status_code=303)
+
+    cols = set(Car.model_fields.keys())
+    seen_vins = set()
+    inserted = skipped = 0
     with DBSession(engine) as s:
-        for row in rdr:
-            data = {k: row.get(k) for k in keep}
+        for item in items:
+            if not isinstance(item, dict):
+                skipped += 1
+                continue
+            data = {k: item.get(k) for k in cols}
             vin = (data.get("vin") or "").strip()
-            car = None
-            if vin:
-                car = s.exec(select(Car).where(Car.vin == vin)).first()
-            if car:
-                before = car.model_dump() if hasattr(car, "model_dump") else car.__dict__.copy()
-                for k, v in data.items():
-                    setattr(car, k, v)
-                audit(
-                    request.session.get("admin_user", "admin"),
-                    "update",
-                    "cars",
-                    car.id,
-                    before,
-                    data,
-                    get_ip(request),
-                )
-                updated += 1
-            else:
-                car = Car(**data)
-                s.add(car)
-                s.flush()
-                audit(
-                    request.session.get("admin_user", "admin"),
-                    "create",
-                    "cars",
-                    car.id,
-                    None,
-                    data,
-                    get_ip(request),
-                )
-                inserted += 1
+            if not vin or vin in seen_vins:
+                skipped += 1
+                continue
+            seen_vins.add(vin)
+            exists = s.exec(select(Car).where(Car.vin == vin)).first()
+            if exists:
+                skipped += 1
+                continue
+            car = Car(**data)
+            s.add(car)
+            s.flush()
+            audit(
+                request.session.get("admin_user", "admin"),
+                "create",
+                "cars",
+                car.id,
+                None,
+                data,
+                get_ip(request),
+            )
+            inserted += 1
         s.commit()
-    flash(request, f"Import done: {inserted} inserted, {updated} updated", "success")
+    flash(request, f"Import done: {inserted} inserted, {skipped} skipped", "success")
     return RedirectResponse("/admin/cars", status_code=303)
 
 # Imports
