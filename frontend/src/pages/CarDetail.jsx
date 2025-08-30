@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { getJSON } from "../api";
 import Gallery from "../components/Gallery";
@@ -6,6 +6,7 @@ import SourceLogo from "../components/SourceLogo";
 import DealershipLogo from "../components/DealershipLogo";
 import { fmtMoney, fmtNum, fmtDate, toList } from "../utils/text";
 import { useToast } from "../ToastContext";
+import { normalizeCar } from "../utils/normalizeCar";
 
 const SHOW_KEYS = [
   ["Year","year"], ["Make","make"], ["Model","model"], ["Trim","trim"],
@@ -30,7 +31,7 @@ export default function CarDetail() {
       try {
         setLoading(true);
         const data = await getJSON(`/cars/${encodeURIComponent(id)}`);
-        setCar(data);
+        setCar(normalizeCar(data));
       } catch (e) {
         addToast(String(e), "error");
       } finally {
@@ -39,24 +40,9 @@ export default function CarDetail() {
     })();
   }, [id, addToast]);
 
-  const images = useMemo(()=> {
-    if (!car) return [];
-    const imgs = [];
-    if (car.main_image) imgs.push(car.main_image);
-    if (car.image_url) imgs.push(car.image_url);
-    if (car.image) imgs.push(car.image);
-    if (car.thumbnail) imgs.push(car.thumbnail);
-    if (Array.isArray(car.images)) imgs.push(...car.images);
-    return Array.from(new Set(imgs.filter(Boolean)));
-  }, [car]);
-
-  const title = useMemo(()=> {
-    if (!car) return "";
-    const bits = [car.year, car.make, car.model, car.trim].filter(v => v && v !== "null");
-    return car.title || bits.join(" ") || "Car";
-  }, [car]);
-
-  const sourceHidden = String(car?.source||"").toLowerCase() === "json_import";
+  const images = car?.__images || [];
+  const title = car?.__title || car?.title || "";
+  const sourceHidden = car?.__sourceHidden;
 
   if (loading) return <div className="state">Loading…</div>;
   if (!car) return <div className="state">Not found.</div>;

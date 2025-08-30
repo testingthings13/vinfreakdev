@@ -190,6 +190,10 @@ def list_cars(dealership_id: int | None = Query(None)):
                     data = c.model_dump()
                 except Exception:
                     data = {k: getattr(c, k, None) for k in ("id","vin","year","make","model","price","currency","source","url","title","description","image_url","posted_at","dealership_id")}
+                imgs = _parse_images(getattr(c, "images_json", None))
+                data["images"] = imgs
+                if not data.get("image_url") and imgs:
+                    data["image_url"] = imgs[0]
                 d = dealerships.get(getattr(c, "dealership_id", None))
                 if d:
                     try:
@@ -225,6 +229,10 @@ def list_cars(dealership_id: int | None = Query(None)):
             car.pop("d_name", None)
             car.pop("d_logo", None)
             car["dealership"] = d
+            imgs = _parse_images(car.get("images_json"))
+            car["images"] = imgs
+            if not car.get("image_url") and imgs:
+                car["image_url"] = imgs[0]
             res.append(car)
         return res
 
@@ -255,6 +263,10 @@ def get_car(id: str):
                 data["dealership"] = {"id": d.id, "name": d.name, "logo_url": getattr(d, "logo_url", None)}
         else:
             data["dealership"] = None
+        imgs = _parse_images(getattr(car, "images_json", None))
+        data["images"] = imgs
+        if not data.get("image_url") and imgs:
+            data["image_url"] = imgs[0]
         return data
 
 @app.get("/dealerships")
@@ -291,6 +303,36 @@ def _maybe_int(val: Optional[str]) -> Optional[int]:
         return int(val) if val not in (None, "") else None
     except ValueError:
         return None
+
+
+def _parse_images(value: Optional[str]) -> list[str]:
+    """Return a list of image URLs from various textual inputs.
+
+    Accepts JSON arrays, comma-separated strings, or newline separated
+    lists. Invalid JSON falls back to splitting on commas/newlines.
+    """
+    if not value:
+        return []
+    if isinstance(value, str):
+        value = value.strip()
+    if not value:
+        return []
+    try:
+        parsed = json.loads(value)
+        if isinstance(parsed, list):
+            return [str(x) for x in parsed if x]
+        if isinstance(parsed, str):
+            return [parsed] if parsed else []
+    except Exception:
+        pass
+    parts = [p.strip() for p in str(value).replace(",", "\n").splitlines() if p.strip()]
+    return parts
+
+
+def _parse_images_form(value: Optional[str]) -> Optional[str]:
+    """Normalize image input from admin forms to a JSON string."""
+    imgs = _parse_images(value)
+    return json.dumps(imgs) if imgs else None
 
 # --- Dealership admin ---
 @app.get("/admin/dealerships", response_class=HTMLResponse)
@@ -543,6 +585,7 @@ def admin_car_new(request: Request, _=Depends(admin_session_required)):
             "models": models,
             "categories": categories,
             "dealerships": dealerships,
+            "images_text": "",
             "flash": pop_flash(request),
         },
     )
@@ -556,7 +599,7 @@ def admin_car_create(
     price: float = Form(None), mileage: int = Form(None), currency: str = Form("USD"),
     city: str = Form(None), state: str = Form(None),
     auction_status: str = Form(None), lot_number: str = Form(None), source: str = Form(None),
-    url: str = Form(None), title: str = Form(None), image_url: str = Form(None),
+    url: str = Form(None), title: str = Form(None), image_url: str = Form(None), images_input: str = Form(None, alias="images_json"),
     description: str = Form(None), seller_name: str = Form(None), seller_rating: str = Form(None), seller_reviews: str = Form(None),
     posted_at: str = Form(None), dealership_id: str | None = Form(None),
     _=Depends(admin_session_required),
@@ -570,10 +613,11 @@ def admin_car_create(
         dealership_id_i = _to_int(dealership_id)
         make_name = s.get(Make, make_id_i).name if make_id_i else None
         model_name = s.get(Model, model_id_i).name if model_id_i else None
+        images_json = _parse_images_form(images_input)
         payload = {k:v for k,v in dict(vin=vin, year=year, make=make_name, make_id=make_id_i, model=model_name, model_id=model_id_i, category_id=category_id_i,
                                        trim=trim, price=price, mileage=mileage, currency=currency,
                                        city=city, state=state, auction_status=auction_status, lot_number=lot_number, source=source,
-                                       url=url, title=title, image_url=image_url, description=description, seller_name=seller_name,
+                                       url=url, title=title, image_url=image_url, images_json=images_json, description=description, seller_name=seller_name,
                                        seller_rating=seller_rating, seller_reviews=seller_reviews, posted_at=posted_at, dealership_id=dealership_id_i).items() if k in allowed}
         c = Car(**payload)
         s.add(c)
@@ -666,6 +710,12 @@ def admin_car_edit(request: Request, car_id: int, _=Depends(admin_session_requir
         models = s.exec(select(Model).order_by(Model.name)).all()
         categories = s.exec(select(Category).order_by(Category.name)).all()
         dealerships = s.exec(select(Dealership).order_by(Dealership.name)).all()
+    images_text = ""
+    if car and getattr(car, "images_json", None):
+        try:
+            images_text = "\n".join(json.loads(car.images_json))
+        except Exception:
+            images_text = car.images_json
     t = csrf_token(request)
     resp = templates.TemplateResponse(
         request,
@@ -679,6 +729,7 @@ def admin_car_edit(request: Request, car_id: int, _=Depends(admin_session_requir
             "models": models,
             "categories": categories,
             "dealerships": dealerships,
+            "images_text": images_text,
             "flash": pop_flash(request),
         },
     )
@@ -692,7 +743,7 @@ def admin_car_update(
     price: float = Form(None), mileage: int = Form(None), currency: str = Form("USD"),
     city: str = Form(None), state: str = Form(None),
     auction_status: str = Form(None), lot_number: str = Form(None), source: str = Form(None),
-    url: str = Form(None), title: str = Form(None), image_url: str = Form(None),
+    url: str = Form(None), title: str = Form(None), image_url: str = Form(None), images_input: str = Form(None, alias="images_json"),
     description: str = Form(None), seller_name: str = Form(None), seller_rating: str = Form(None), seller_reviews: str = Form(None),
     posted_at: str = Form(None), dealership_id: str | None = Form(None),
     _=Depends(admin_session_required),
@@ -706,10 +757,11 @@ def admin_car_update(
         dealership_id_i = _to_int(dealership_id)
         make_name = s.get(Make, make_id_i).name if make_id_i else None
         model_name = s.get(Model, model_id_i).name if model_id_i else None
+        images_json = _parse_images_form(images_input)
         payload = {k:v for k,v in dict(vin=vin, year=year, make=make_name, make_id=make_id_i, model=model_name, model_id=model_id_i, category_id=category_id_i,
                                        trim=trim, price=price, mileage=mileage, currency=currency,
                                        city=city, state=state, auction_status=auction_status, lot_number=lot_number, source=source,
-                                       url=url, title=title, image_url=image_url, description=description, seller_name=seller_name,
+                                       url=url, title=title, image_url=image_url, images_json=images_json, description=description, seller_name=seller_name,
                                        seller_rating=seller_rating, seller_reviews=seller_reviews, posted_at=posted_at, dealership_id=dealership_id_i).items() if k in allowed}
         car = s.get(Car, car_id)
         before = car.model_dump() if hasattr(car, "model_dump") else car.__dict__.copy()

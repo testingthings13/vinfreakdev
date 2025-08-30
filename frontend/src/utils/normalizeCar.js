@@ -19,10 +19,29 @@ export function normalizeCar(raw) {
   const sourceHidden = BAD_PUBLIC_SOURCE.has(sourceRaw);
   const source = sourceHidden ? "" : sourceRaw;
 
-  const images = [
-    raw.main_image, raw.image_url, raw.image, raw.thumbnail, raw.photo_url,
+  let images = [
+    raw.main_image,
+    raw.image_url,
+    raw.image,
+    raw.thumbnail,
+    raw.photo_url,
     ...(Array.isArray(raw.images) ? raw.images : [])
-  ].filter(Boolean);
+  ];
+  if (raw.images_json) {
+    try {
+      const extra = JSON.parse(raw.images_json);
+      if (Array.isArray(extra)) images.push(...extra);
+      else if (typeof extra === "string") images.push(extra);
+    } catch {
+      images.push(
+        ...String(raw.images_json)
+          .split(/\n|,/)
+          .map((s) => s.trim())
+          .filter(Boolean)
+      );
+    }
+  }
+  images = images.filter(Boolean);
 
   const status = (raw.auction_status || "").toUpperCase();
 
