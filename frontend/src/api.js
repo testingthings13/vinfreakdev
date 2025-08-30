@@ -84,6 +84,7 @@ function toParams(filters = {}, paging = {}) {
   if (filters.priceMin) p.set("price_min", String(filters.priceMin));
   if (filters.priceMax) p.set("price_max", String(filters.priceMax));
   if (filters.source) p.set("source", filters.source);
+  if (filters.dealershipId) p.set("dealership_id", String(filters.dealershipId));
   if (filters.sort) p.set("sort", filters.sort); // pass-through sort key
 
   return p;
