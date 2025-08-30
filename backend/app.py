@@ -1,7 +1,7 @@
 from secrets import token_urlsafe
 import hmac
 from fastapi import FastAPI, Request, Depends, Form, UploadFile, File, Response, HTTPException, Query
-from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
@@ -12,11 +12,9 @@ from sqlalchemy import text
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from sqlalchemy import func
-import logging
 
 from backend_settings import settings
 security = HTTPBasic()
-logger = logging.getLogger(__name__)
 
 def require_admin(
     request: Request,
@@ -206,36 +204,37 @@ def list_cars(dealership_id: int | None = Query(None)):
                     data["dealership"] = None
                 result.append(data)
             return result
-    except Exception as e:
-        logger.exception("ORM list_cars failed; falling back to raw SQL")
-        with DBSession(engine) as s:
-            sql = """
-                SELECT cars.*, d.id AS d_id, d.name AS d_name, d.logo_url AS d_logo
-                FROM cars LEFT JOIN dealerships d ON cars.dealership_id = d.id
-                WHERE cars.deleted_at IS NULL
-            """
-            args = {}
-            if dealership_id is not None:
-                sql += " AND cars.dealership_id = :dealership_id"
-                args["dealership_id"] = dealership_id
-            sql += " ORDER BY COALESCE(cars.posted_at,'') DESC, cars.id DESC"
-            rows = s.exec(text(sql).bindparams(**args)).mappings().all()
-            res = []
-            for r in rows:
-                car = dict(r)
-                d = None
-                if r.get("d_id") is not None:
-                    d = {"id": r["d_id"], "name": r["d_name"], "logo_url": r["d_logo"]}
-                car.pop("d_id", None)
-                car.pop("d_name", None)
-                car.pop("d_logo", None)
-                car["dealership"] = d
-                imgs = _parse_images(car.get("images_json"))
-                car["images"] = imgs
-                if not car.get("image_url") and imgs:
-                    car["image_url"] = imgs[0]
-                res.append(car)
-            return res
+    except Exception:
+        pass
+    # raw fallback
+    with DBSession(engine) as s:
+        sql = """
+            SELECT cars.*, d.id AS d_id, d.name AS d_name, d.logo_url AS d_logo
+            FROM cars LEFT JOIN dealerships d ON cars.dealership_id = d.id
+            WHERE cars.deleted_at IS NULL
+        """
+        args = {}
+        if dealership_id is not None:
+            sql += " AND cars.dealership_id = :dealership_id"
+            args["dealership_id"] = dealership_id
+        sql += " ORDER BY COALESCE(cars.posted_at,'') DESC, cars.id DESC"
+        rows = s.exec(text(sql).bindparams(**args)).mappings().all()
+        res = []
+        for r in rows:
+            car = dict(r)
+            d = None
+            if r.get("d_id") is not None:
+                d = {"id": r["d_id"], "name": r["d_name"], "logo_url": r["d_logo"]}
+            car.pop("d_id", None)
+            car.pop("d_name", None)
+            car.pop("d_logo", None)
+            car["dealership"] = d
+            imgs = _parse_images(car.get("images_json"))
+            car["images"] = imgs
+            if not car.get("image_url") and imgs:
+                car["image_url"] = imgs[0]
+            res.append(car)
+        return res
 
 @app.get("/cars/{id}")
 def get_car(id: str):
@@ -703,121 +702,6 @@ def admin_cars_bulk(
         s.commit()
     return RedirectResponse("/admin/cars", status_code=303)
 
-# Import/Export
-@app.get("/admin/cars/export")
-def admin_cars_export(fmt: str = "csv", _=Depends(admin_session_required)):
-    with DBSession(engine) as s:
-        rows = s.exec(text("SELECT * FROM cars WHERE deleted_at IS NULL ORDER BY COALESCE(posted_at,'') DESC, id DESC")).mappings().all()
-    if fmt == "json":
-        data = json.dumps([dict(r) for r in rows], ensure_ascii=False).encode("utf-8")
-        return StreamingResponse(io.BytesIO(data), media_type="application/json", headers={"Content-Disposition":"attachment; filename=cars.json"})
-    # CSV
-    buf = io.StringIO()
-    if rows:
-        fieldnames = list(rows[0].keys())
-        w = csv.DictWriter(buf, fieldnames=fieldnames)
-        w.writeheader()
-        for r in rows: w.writerow(dict(r))
-    return StreamingResponse(io.BytesIO(buf.getvalue().encode("utf-8")), media_type="text/csv", headers={"Content-Disposition":"attachment; filename=cars.csv"})
-
-@app.get("/admin/cars/import")
-async def admin_cars_import_get():
-    return Response("Use POST with a JSON file.", status_code=405)
-
-@app.post("/admin/cars/import")
-async def admin_cars_import(
-    request: Request,
-    csrf: str = Form(...),
-    file: UploadFile = File(...),
-    _=Depends(admin_session_required),
-):
-    require_csrf(request, csrf)
-    content = await file.read()
-    try:
-        items = json.loads(content)
-    except Exception:
-        flash(request, "Invalid JSON file", "error")
-        return RedirectResponse("/admin/cars", status_code=303)
-    if not isinstance(items, list):
-        flash(request, "JSON must be an array of objects", "error")
-        return RedirectResponse("/admin/cars", status_code=303)
-
-    cols = set(Car.model_fields.keys())
-    seen_vins = set()
-    inserted = skipped = 0
-    with DBSession(engine) as s:
-        now = datetime.now(timezone.utc).isoformat()
-        job = ImportJob(
-            source=file.filename,
-            status="running",
-            started_at=now,
-            created=now,
-            total_items=len(items),
-        )
-        s.add(job)
-        s.flush()
-        after = job.model_dump() if hasattr(job, "model_dump") else job.__dict__.copy()
-        audit(
-            request.session.get("admin_user", "admin"),
-            "create",
-            "import_jobs",
-            job.id,
-            None,
-            after,
-            get_ip(request),
-        )
-        for item in items:
-            if not isinstance(item, dict):
-                skipped += 1
-                continue
-            imgs_val = item.get("images")
-            if imgs_val:
-                if isinstance(imgs_val, list):
-                    imgs = [str(x).strip() for x in imgs_val if x]
-                else:
-                    imgs = _parse_images(imgs_val)
-                seen_urls = set()
-                unique = []
-                for url in imgs:
-                    if url and url not in seen_urls:
-                        unique.append(url)
-                        seen_urls.add(url)
-                if unique:
-                    item["image_url"] = unique[0]
-                    item["images_json"] = json.dumps(unique[1:]) if len(unique) > 1 else None
-            data = {k: item.get(k) for k in cols}
-            vin = (data.get("vin") or "").strip()
-            if not vin or vin in seen_vins:
-                skipped += 1
-                continue
-            seen_vins.add(vin)
-            exists = s.exec(select(Car).where(Car.vin == vin)).first()
-            if exists:
-                skipped += 1
-                continue
-            data["import_job_id"] = job.id
-            car = Car(**data)
-            s.add(car)
-            s.flush()
-            audit(
-                request.session.get("admin_user", "admin"),
-                "create",
-                "cars",
-                car.id,
-                None,
-                data,
-                get_ip(request),
-            )
-            inserted += 1
-        job.status = "finished"
-        job.finished_at = datetime.now(timezone.utc).isoformat()
-        job.created_items = inserted
-        job.updated_items = 0
-        s.add(job)
-        s.commit()
-    flash(request, f"Import done: {inserted} inserted, {skipped} skipped", "success")
-    return RedirectResponse("/admin/cars", status_code=303)
-
 @app.get("/admin/cars/{car_id}", response_class=HTMLResponse)
 def admin_car_edit(request: Request, car_id: int, _=Depends(admin_session_required)):
     with DBSession(engine) as s:
@@ -918,15 +802,106 @@ def admin_car_delete(request: Request, car_id: int, _=Depends(admin_session_requ
             s.commit()
     flash(request, "Car deleted", "success")
     return RedirectResponse("/admin/cars", status_code=303)
+
+# Import/Export
+@app.get("/admin/cars/export")
+def admin_cars_export(fmt: str = "csv", _=Depends(admin_session_required)):
+    with DBSession(engine) as s:
+        rows = s.exec(text("SELECT * FROM cars WHERE deleted_at IS NULL ORDER BY COALESCE(posted_at,'') DESC, id DESC")).mappings().all()
+    if fmt == "json":
+        data = json.dumps([dict(r) for r in rows], ensure_ascii=False).encode("utf-8")
+        return StreamingResponse(io.BytesIO(data), media_type="application/json", headers={"Content-Disposition":"attachment; filename=cars.json"})
+    # CSV
+    buf = io.StringIO()
+    if rows:
+        fieldnames = list(rows[0].keys())
+        w = csv.DictWriter(buf, fieldnames=fieldnames)
+        w.writeheader()
+        for r in rows: w.writerow(dict(r))
+    return StreamingResponse(io.BytesIO(buf.getvalue().encode("utf-8")), media_type="text/csv", headers={"Content-Disposition":"attachment; filename=cars.csv"})
+
+@app.get("/admin/cars/import")
+async def admin_cars_import_get():
+    return Response("Use POST with a JSON file.", status_code=405)
+
+@app.post("/admin/cars/import")
+async def admin_cars_import(
+    request: Request,
+    csrf: str = Form(...),
+    file: UploadFile = File(...),
+    _=Depends(admin_session_required),
+):
+    require_csrf(request, csrf)
+    content = await file.read()
+    try:
+        items = json.loads(content)
+    except Exception:
+        flash(request, "Invalid JSON file", "error")
+        return RedirectResponse("/admin/cars", status_code=303)
+    if not isinstance(items, list):
+        flash(request, "JSON must be an array of objects", "error")
+        return RedirectResponse("/admin/cars", status_code=303)
+
+    cols = set(Car.model_fields.keys())
+    seen_vins = set()
+    inserted = skipped = 0
+    with DBSession(engine) as s:
+        for item in items:
+            if not isinstance(item, dict):
+                skipped += 1
+                continue
+
+            imgs_val = item.get("images")
+            if imgs_val:
+                if isinstance(imgs_val, list):
+                    imgs = [str(x).strip() for x in imgs_val if x]
+                else:
+                    imgs = _parse_images(imgs_val)
+                seen_urls: set[str] = set()
+                unique: list[str] = []
+                for url in imgs:
+                    if url and url not in seen_urls:
+                        unique.append(url)
+                        seen_urls.add(url)
+                if unique:
+                    item["image_url"] = unique[0]
+                    item["images_json"] = (
+                        json.dumps(unique[1:]) if len(unique) > 1 else None
+                    )
+
+            data = {k: item.get(k) for k in cols}
+            vin = (data.get("vin") or "").strip()
+            if not vin or vin in seen_vins:
+                skipped += 1
+                continue
+            seen_vins.add(vin)
+            exists = s.exec(select(Car).where(Car.vin == vin)).first()
+            if exists:
+                skipped += 1
+                continue
+            car = Car(**data)
+            s.add(car)
+            s.flush()
+            audit(
+                request.session.get("admin_user", "admin"),
+                "create",
+                "cars",
+                car.id,
+                None,
+                data,
+                get_ip(request),
+            )
+            inserted += 1
+        s.commit()
+    flash(request, f"Import done: {inserted} inserted, {skipped} skipped", "success")
+    return RedirectResponse("/admin/cars", status_code=303)
+
 # Imports
 @app.get("/admin/imports", response_class=HTMLResponse)
 def admin_imports(request: Request, _=Depends(admin_session_required)):
     with DBSession(engine) as s:
         jobs = s.exec(
-            text(
-                "SELECT import_jobs.*, (SELECT COUNT(*) FROM cars WHERE import_job_id = import_jobs.id AND deleted_at IS NULL) AS car_count "
-                "FROM import_jobs ORDER BY created DESC"
-            )
+            text("SELECT * FROM import_jobs ORDER BY created DESC")
         ).mappings().all()
     return templates.TemplateResponse(
         request,
@@ -1023,43 +998,6 @@ def admin_import_cancel(
             s.commit()
             flash(request, "Job cancelled", "success")
     return RedirectResponse(f"/admin/imports/{id}", status_code=303)
-
-
-@app.post("/admin/imports/{id}/delete")
-def admin_import_delete(
-    request: Request,
-    id: int,
-    csrf: str = Form(...),
-    _=Depends(admin_session_required),
-):
-    require_csrf(request, csrf)
-    with DBSession(engine) as s:
-        job = s.get(ImportJob, id)
-        if not job:
-            raise HTTPException(status_code=404)
-        actor = request.session.get("admin_user", "admin")
-        ip = get_ip(request)
-        cars = s.exec(select(Car).where(Car.import_job_id == id)).all()
-        now = datetime.now(timezone.utc).isoformat()
-        for car in cars:
-            before = car.model_dump() if hasattr(car, "model_dump") else None
-            car.deleted_at = now
-            audit(
-                actor,
-                "delete",
-                "cars",
-                car.id,
-                before,
-                {"deleted_at": car.deleted_at},
-                ip,
-            )
-            s.add(car)
-        before_job = job.model_dump() if hasattr(job, "model_dump") else job.__dict__.copy()
-        audit(actor, "delete", "import_jobs", id, before_job, None, ip)
-        s.delete(job)
-        s.commit()
-    flash(request, "Import deleted", "success")
-    return RedirectResponse("/admin/imports", status_code=303)
 
 # Settings
 @app.get("/admin/settings", response_class=HTMLResponse)

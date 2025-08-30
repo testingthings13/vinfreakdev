@@ -1,4 +1,5 @@
 import sys, json, re, requests
+from datetime import datetime
 
 API = "http://127.0.0.1:8000"
 
@@ -67,6 +68,7 @@ def normalize(item):
     address = loc.get("address")
     city = parse_city(address)
     state = parse_state(item.get("status"), address)
+    location_url = loc.get("url")
     transmission = map_transmission(item.get("transmission"))
     drivetrain = map_drivetrain(item.get("drivetrain"))
     exterior_color = item.get("exteriorColor")
@@ -149,7 +151,6 @@ def normalize(item):
         "seller_notes": seller_notes,
         "other_items": other_items,
         "engine": engine,
-        "posted_at": None,
         "image_url": image_url,
         "images_json": images_json,
         "source": "carsandbids",

@@ -13,7 +13,10 @@ export function normalizeCar(raw) {
   const mileage = raw.mileage ?? raw.odometer ?? null;
 
   /* ✅ parenthesized to avoid `??` + `||` conflict */
-  const location = raw.location ?? ([raw.city, raw.state].filter(Boolean).join(", ") || null);
+  const location =
+    raw.location ??
+    raw.location_address ??
+    ([raw.city, raw.state].filter(Boolean).join(", ") || null);
 
   const sourceRaw = (raw.source ?? raw.market ?? "").toLowerCase().trim();
   const sourceHidden = BAD_PUBLIC_SOURCE.has(sourceRaw);
@@ -42,12 +45,6 @@ export function normalizeCar(raw) {
     }
   }
   images = images.filter(Boolean);
-  const seen = new Set();
-  images = images.filter((url) => {
-    if (seen.has(url)) return false;
-    seen.add(url);
-    return true;
-  });
 
   const status = (raw.auction_status || "").toUpperCase();
 

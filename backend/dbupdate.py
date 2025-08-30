@@ -63,12 +63,6 @@ for car in data:
     INSERT OR REPLACE INTO cars (
         vin, make, model, trim, year, mileage, price, currency, city, state, seller_type,
         exterior_color, interior_color, transmission, drivetrain, fuel_type,
-        body_type, auction_status, end_time, time_left, number_of_views, number_of_bids,
-        description, highlights, equipment, modifications, known_flaws, service_history,
-        ownership_history, seller_notes, other_items, engine,
-        posted_at, image_url, images_json, source, url
-    ) VALUES (
-        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
     )
     """, (
         car.get("vin"),

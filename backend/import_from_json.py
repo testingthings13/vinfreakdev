@@ -1,4 +1,5 @@
 import sys, json, re, requests
+from datetime import datetime
 
 API = "http://127.0.0.1:8000"
 
@@ -101,6 +102,8 @@ def normalize(item):
     seller = item.get("seller") or {}
     seller_name = seller.get("name")
     seller_url = seller.get("url")
+    seller_rating = seller.get("rating")
+    seller_reviews = seller.get("reviews")
 
     # basic validation for our API
     if not (make and model and year and price is not None):
@@ -124,11 +127,8 @@ def normalize(item):
         "drivetrain": drivetrain,
         "fuel_type": None,
         "body_type": body_type,
-        "posted_at": None,
-        "source": "json_import",
-        "url": url,
-        "title": title,
         "auction_status": auction_status,
+        "lot_number": lot_number,
         "end_time": end_time,
         "time_left": time_left,
         "number_of_views": number_of_views,
@@ -149,6 +149,12 @@ def normalize(item):
         "location_url": location_url,
         "seller_name": seller_name,
         "seller_url": seller_url,
+        "seller_rating": seller_rating,
+        "seller_reviews": seller_reviews,
+        "posted_at": datetime.utcnow().isoformat(),
+        "source": "json_import",
+        "url": url,
+        "title": title,
     }
 
 def chunked(seq, n):
