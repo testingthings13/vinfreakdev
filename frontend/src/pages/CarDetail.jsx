@@ -12,7 +12,7 @@ const SHOW_KEYS = [
   ["Year","year"], ["Make","make"], ["Model","model"], ["Trim","trim"],
   ["Body","body_type"], ["Engine","engine"], ["Fuel","fuel_type"], ["Transmission","transmission"],
   ["Drivetrain","drivetrain"], ["Exterior","exterior_color"], ["Interior","interior_color"],
-  ["Mileage","mileage"], ["Price","price"], ["Currency","currency"], ["Location","location"],
+  ["Mileage","mileage"], ["Price","price"], ["Location","location"],
   ["City","city"], ["State","state"], ["Seller","seller_name"], ["Seller Type","seller_type"],
   ["Auction","auction_status"], ["Lot #","lot_number"], 
   ["Views","number_of_views"], ["Bids","number_of_bids"],

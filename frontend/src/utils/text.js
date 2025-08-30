@@ -2,7 +2,17 @@ export const fmtNum = (v, d=0) => {
   if (v === null || v === undefined || v === "" || isNaN(Number(v))) return "—";
   return Number(v).toLocaleString(undefined, { maximumFractionDigits: d });
 };
-export const fmtMoney = (v, cur="USD") => (v==null? "—" : `${cur==="USD"?"$":""}${fmtNum(v)}`);
+export const fmtMoney = (v, cur="USD") => {
+  if (v == null) return "—";
+  if (cur === "USD") {
+    return new Intl.NumberFormat(undefined, {
+      style: "currency",
+      currency: "USD",
+      maximumFractionDigits: 0,
+    }).format(v);
+  }
+  return `${fmtNum(v)} ${cur}`;
+};
 export const fmtDate = (iso) => {
   if (!iso) return "—";
   const d = new Date(iso);
