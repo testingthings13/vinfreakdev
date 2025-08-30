@@ -20,6 +20,7 @@ def ensure_columns():
             "model_id": "INTEGER",
             "category_id": "INTEGER",
             "dealership_id": "INTEGER",
+            "import_job_id": "INTEGER",
             "seller_type": "TEXT",
             "exterior_color": "TEXT",
             "interior_color": "TEXT",
@@ -110,4 +111,5 @@ def init_db():
         s.exec(text("CREATE INDEX IF NOT EXISTS idx_cars_model ON cars(model)"))
         s.exec(text("CREATE INDEX IF NOT EXISTS idx_cars_posted_at ON cars(posted_at)"))
         s.exec(text("CREATE INDEX IF NOT EXISTS idx_cars_status ON cars(auction_status)"))
+        s.exec(text("CREATE INDEX IF NOT EXISTS idx_cars_import_job ON cars(import_job_id)"))
         s.commit()

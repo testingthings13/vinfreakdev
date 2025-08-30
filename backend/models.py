@@ -47,6 +47,7 @@ class Car(SQLModel, table=True):
     model_id: int | None = Field(default=None, foreign_key="models.id")
     category_id: int | None = Field(default=None, foreign_key="categories.id")
     dealership_id: int | None = Field(default=None, foreign_key="dealerships.id")
+    import_job_id: int | None = Field(default=None, foreign_key="import_jobs.id")
     trim: str | None = None
     year: int | None = None
     mileage: int | None = None
