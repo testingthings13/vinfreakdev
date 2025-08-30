@@ -847,6 +847,26 @@ async def admin_cars_import(
     seen_vins = set()
     inserted = skipped = 0
     with DBSession(engine) as s:
+        now = datetime.now(timezone.utc).isoformat()
+        job = ImportJob(
+            source=file.filename,
+            status="running",
+            started_at=now,
+            created=now,
+            total_items=len(items),
+        )
+        s.add(job)
+        s.flush()
+        after = job.model_dump() if hasattr(job, "model_dump") else job.__dict__.copy()
+        audit(
+            request.session.get("admin_user", "admin"),
+            "create",
+            "import_jobs",
+            job.id,
+            None,
+            after,
+            get_ip(request),
+        )
         for item in items:
             if not isinstance(item, dict):
                 skipped += 1
@@ -861,6 +881,7 @@ async def admin_cars_import(
             if exists:
                 skipped += 1
                 continue
+            data["import_job_id"] = job.id
             car = Car(**data)
             s.add(car)
             s.flush()
@@ -874,6 +895,11 @@ async def admin_cars_import(
                 get_ip(request),
             )
             inserted += 1
+        job.status = "finished"
+        job.finished_at = datetime.now(timezone.utc).isoformat()
+        job.created_items = inserted
+        job.updated_items = 0
+        s.add(job)
         s.commit()
     flash(request, f"Import done: {inserted} inserted, {skipped} skipped", "success")
     return RedirectResponse("/admin/cars", status_code=303)
@@ -883,7 +909,10 @@ async def admin_cars_import(
 def admin_imports(request: Request, _=Depends(admin_session_required)):
     with DBSession(engine) as s:
         jobs = s.exec(
-            text("SELECT * FROM import_jobs ORDER BY created DESC")
+            text(
+                "SELECT import_jobs.*, (SELECT COUNT(*) FROM cars WHERE import_job_id = import_jobs.id AND deleted_at IS NULL) AS car_count "
+                "FROM import_jobs ORDER BY created DESC"
+            )
         ).mappings().all()
     return templates.TemplateResponse(
         request,
@@ -980,6 +1009,43 @@ def admin_import_cancel(
             s.commit()
             flash(request, "Job cancelled", "success")
     return RedirectResponse(f"/admin/imports/{id}", status_code=303)
+
+
+@app.post("/admin/imports/{id}/delete")
+def admin_import_delete(
+    request: Request,
+    id: int,
+    csrf: str = Form(...),
+    _=Depends(admin_session_required),
+):
+    require_csrf(request, csrf)
+    with DBSession(engine) as s:
+        job = s.get(ImportJob, id)
+        if not job:
+            raise HTTPException(status_code=404)
+        actor = request.session.get("admin_user", "admin")
+        ip = get_ip(request)
+        cars = s.exec(select(Car).where(Car.import_job_id == id)).all()
+        now = datetime.now(timezone.utc).isoformat()
+        for car in cars:
+            before = car.model_dump() if hasattr(car, "model_dump") else None
+            car.deleted_at = now
+            audit(
+                actor,
+                "delete",
+                "cars",
+                car.id,
+                before,
+                {"deleted_at": car.deleted_at},
+                ip,
+            )
+            s.add(car)
+        before_job = job.model_dump() if hasattr(job, "model_dump") else job.__dict__.copy()
+        audit(actor, "delete", "import_jobs", id, before_job, None, ip)
+        s.delete(job)
+        s.commit()
+    flash(request, "Import deleted", "success")
+    return RedirectResponse("/admin/imports", status_code=303)
 
 # Settings
 @app.get("/admin/settings", response_class=HTMLResponse)
