@@ -105,6 +105,12 @@ def normalize(item):
     seller_rating = seller.get("rating")
     seller_reviews = seller.get("reviews")
 
+    lot_number = item.get("lotNumber") or item.get("lot_number")
+    if not lot_number and url:
+        m = re.search(r"/auctions/([^/]+)/", url)
+        if m:
+            lot_number = m.group(1)
+
     # basic validation for our API
     if not (make and model and year and price is not None):
         return None
