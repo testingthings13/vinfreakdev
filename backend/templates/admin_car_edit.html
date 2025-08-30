@@ -64,6 +64,12 @@
     <label>Seller Name <input name="seller_name" value="{{ car.seller_name if car else '' }}"></label>
     <label>Seller Rating <input name="seller_rating" value="{{ car.seller_rating if car else '' }}"></label>
     <label>Seller Reviews <input name="seller_reviews" value="{{ car.seller_reviews if car else '' }}"></label>
+    <label>Location Address <input name="location_address" value="{{ car.location_address if car else '' }}"></label>
+    <label>Location URL <input name="location_url" value="{{ car.location_url if car else '' }}"></label>
+    <label>End Time <input name="end_time" value="{{ car.end_time if car else '' }}" placeholder="YYYY-MM-DDThh:mm:ssZ"></label>
+    <label>Time Left <input name="time_left" value="{{ car.time_left if car else '' }}"></label>
+    <label>Views <input type="number" name="number_of_views" value="{{ car.number_of_views if car else '' }}"></label>
+    <label>Bids <input type="number" name="number_of_bids" value="{{ car.number_of_bids if car else '' }}"></label>
   </div>
   <label>Description
     <textarea name="description" rows="6">{{ car.description if car else '' }}</textarea>
