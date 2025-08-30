@@ -12,9 +12,11 @@ from sqlalchemy import text
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from sqlalchemy import func
+import logging
 
 from backend_settings import settings
 security = HTTPBasic()
+logger = logging.getLogger(__name__)
 
 def require_admin(
     request: Request,
@@ -204,37 +206,36 @@ def list_cars(dealership_id: int | None = Query(None)):
                     data["dealership"] = None
                 result.append(data)
             return result
-    except Exception:
-        pass
-    # raw fallback
-    with DBSession(engine) as s:
-        sql = """
-            SELECT cars.*, d.id AS d_id, d.name AS d_name, d.logo_url AS d_logo
-            FROM cars LEFT JOIN dealerships d ON cars.dealership_id = d.id
-            WHERE cars.deleted_at IS NULL
-        """
-        args = {}
-        if dealership_id is not None:
-            sql += " AND cars.dealership_id = :dealership_id"
-            args["dealership_id"] = dealership_id
-        sql += " ORDER BY COALESCE(cars.posted_at,'') DESC, cars.id DESC"
-        rows = s.exec(text(sql).bindparams(**args)).mappings().all()
-        res = []
-        for r in rows:
-            car = dict(r)
-            d = None
-            if r.get("d_id") is not None:
-                d = {"id": r["d_id"], "name": r["d_name"], "logo_url": r["d_logo"]}
-            car.pop("d_id", None)
-            car.pop("d_name", None)
-            car.pop("d_logo", None)
-            car["dealership"] = d
-            imgs = _parse_images(car.get("images_json"))
-            car["images"] = imgs
-            if not car.get("image_url") and imgs:
-                car["image_url"] = imgs[0]
-            res.append(car)
-        return res
+    except Exception as e:
+        logger.exception("ORM list_cars failed; falling back to raw SQL")
+        with DBSession(engine) as s:
+            sql = """
+                SELECT cars.*, d.id AS d_id, d.name AS d_name, d.logo_url AS d_logo
+                FROM cars LEFT JOIN dealerships d ON cars.dealership_id = d.id
+                WHERE cars.deleted_at IS NULL
+            """
+            args = {}
+            if dealership_id is not None:
+                sql += " AND cars.dealership_id = :dealership_id"
+                args["dealership_id"] = dealership_id
+            sql += " ORDER BY COALESCE(cars.posted_at,'') DESC, cars.id DESC"
+            rows = s.exec(text(sql).bindparams(**args)).mappings().all()
+            res = []
+            for r in rows:
+                car = dict(r)
+                d = None
+                if r.get("d_id") is not None:
+                    d = {"id": r["d_id"], "name": r["d_name"], "logo_url": r["d_logo"]}
+                car.pop("d_id", None)
+                car.pop("d_name", None)
+                car.pop("d_logo", None)
+                car["dealership"] = d
+                imgs = _parse_images(car.get("images_json"))
+                car["images"] = imgs
+                if not car.get("image_url") and imgs:
+                    car["image_url"] = imgs[0]
+                res.append(car)
+            return res
 
 @app.get("/cars/{id}")
 def get_car(id: str):
