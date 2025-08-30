@@ -4,7 +4,7 @@ import csv
 from io import StringIO
 
 from sqladmin import ModelView, expose
-from wtforms import FileField
+from wtforms import FileField, BooleanField
 from starlette.requests import Request
 from starlette.responses import Response, PlainTextResponse, HTMLResponse
 
@@ -105,14 +105,24 @@ class DealershipAdmin(ModelView, model=Dealership):
     name_plural = "Dealerships"
     icon = "fa-solid fa-building"
 
-    column_list = [Dealership.id, Dealership.name, Dealership.logo]
-    form_columns = [Dealership.name, "logo_file"]
+    column_list = [Dealership.id, Dealership.name, Dealership.logo_url]
+    form_columns = [Dealership.name, "logo_file", "remove_logo"]
     form_extra_fields = {
         "logo_file": FileField("Logo"),
+        "remove_logo": BooleanField("Remove current logo"),
     }
 
-    async def _handle_logo(self, data: dict):
+    async def _handle_logo(self, data: dict, obj: Dealership | None = None):
+        remove = data.pop("remove_logo", False)
         file = data.pop("logo_file", None)
+        if obj and (remove or (file and getattr(file, "filename", None))) and getattr(obj, "logo_url", None):
+            old_path = os.path.join(settings.UPLOAD_DIR, os.path.basename(obj.logo_url))
+            try:
+                os.remove(old_path)
+            except FileNotFoundError:
+                pass
+        if remove:
+            data["logo_url"] = None
         if file and getattr(file, "filename", None):
             upload_dir = settings.UPLOAD_DIR
             os.makedirs(upload_dir, exist_ok=True)
@@ -121,14 +131,16 @@ class DealershipAdmin(ModelView, model=Dealership):
             content = file.read() if hasattr(file, "read") else await file.read()
             with open(path, "wb") as f:
                 f.write(content)
-            data["logo"] = fname
+            data["logo_url"] = f"/uploads/{fname}"
 
     async def insert_model(self, request, data):
         await self._handle_logo(data)
         return await super().insert_model(request, data)
 
     async def update_model(self, request, pk, data):
-        await self._handle_logo(data)
+        with Session(engine) as s:
+            obj = s.get(Dealership, pk)
+        await self._handle_logo(data, obj)
         return await super().update_model(request, pk, data)
 
 class DashboardView(ModelView):

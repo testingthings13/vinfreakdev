@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { getJSON, getDealerships } from "../api";
+import { getDealerships, getCars } from "../api";
 import { normalizeCar } from "../utils/normalizeCar";
 import useDebounce from "../utils/useDebounce";
 import SearchBar from "../components/SearchBar";
@@ -26,28 +26,28 @@ export default function CarList() {
 
   const [page, setPage] = useState(1);
 
-  // Fetch once
+  // Fetch cars and dealerships whenever dealership filter changes
   useEffect(() => {
     (async () => {
       try {
         setLoading(true);
         const [carData, dealerData] = await Promise.all([
-          getJSON("/cars"),
+          getCars(dealershipId ? { dealershipId } : {}),
           getDealerships(),
         ]);
         const dealerList = Array.isArray(dealerData) ? dealerData : (dealerData.items || dealerData.results || []);
         setDealerships(dealerList);
         const dealerMap = Object.fromEntries(dealerList.map(d => [d.id, d]));
-        const list = Array.isArray(carData) ? carData : (carData.items || carData.results || []);
+        const list = Array.isArray(carData.items) ? carData.items : (Array.isArray(carData) ? carData : (carData.results || []));
         if (!Array.isArray(list)) throw new Error("Backend did not return an array at /cars.");
-        setRaw(list.map(c => ({ ...normalizeCar(c), dealership: dealerMap[c.dealership_id] }))); 
+        setRaw(list.map(c => ({ ...normalizeCar(c), dealership: dealerMap[c.dealership_id] })));
       } catch (e) {
         addToast(String(e), "error");
       } finally {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [dealershipId]);
 
   // Filter + search
   const filtered = useMemo(() => {
@@ -55,15 +55,14 @@ export default function CarList() {
     const byText = (c) => {
       if (!text) return true;
       const hay = [
-        c.__title, c.__make, c.__model, c.__trim, c.__location, c.vin, c.lot_number, c.__source
+        c.__title, c.__make, c.__model, c.__trim, c.__location, c.vin, c.lot_number, c.dealership?.name
       ].filter(Boolean).join(" ").toLowerCase();
       return hay.includes(text);
     };
     const byYear = (c) => (minYear ? (c.__year ?? 0) >= minYear : true) && (maxYear ? (c.__year ?? 9999) <= maxYear : true);
-    const byDealership = (c) => (dealershipId ? String(c.dealership_id) === String(dealershipId) : true);
 
-    return raw.filter(c => byText(c) && byYear(c) && byDealership(c));
-  }, [raw, dq, minYear, maxYear, dealershipId]);
+    return raw.filter(c => byText(c) && byYear(c));
+  }, [raw, dq, minYear, maxYear]);
 
   // Sort
   const sorted = useMemo(() => {
@@ -90,7 +89,7 @@ export default function CarList() {
   const total = sorted.length;
   const start = (page - 1) * PAGE_SIZE;
   const pageItems = sorted.slice(start, start + PAGE_SIZE);
-  useEffect(() => { setPage(1); }, [dq, minYear, maxYear, dealershipId, sort]);
+  useEffect(() => { setPage(1); }, [dq, minYear, maxYear, sort]);
 
   if (loading) return <div className="state">Loading cars…</div>;
 

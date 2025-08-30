@@ -365,6 +365,7 @@ def admin_dealership_update(
     csrf: str = Form(...),
     name: str = Form(...),
     logo: UploadFile | None = File(None),
+    remove_logo: bool = Form(False),
     _=Depends(admin_session_required),
 ):
     require_csrf(request, csrf)
@@ -375,8 +376,20 @@ def admin_dealership_update(
             return RedirectResponse("/admin/dealerships", status_code=303)
         before = d.model_dump() if hasattr(d, "model_dump") else {"name": d.name, "logo_url": d.logo_url}
         d.name = name
-        if logo and getattr(logo, "filename", ""):
+        if remove_logo and d.logo_url:
+            try:
+                (Path(settings.UPLOAD_DIR) / Path(d.logo_url).name).unlink()
+            except FileNotFoundError:
+                pass
+            d.logo_url = None
+        elif logo and getattr(logo, "filename", ""):
             Path(settings.UPLOAD_DIR).mkdir(parents=True, exist_ok=True)
+            # delete previous file if replacing
+            if d.logo_url:
+                try:
+                    (Path(settings.UPLOAD_DIR) / Path(d.logo_url).name).unlink()
+                except FileNotFoundError:
+                    pass
             fname = f"{token_urlsafe(16)}_{logo.filename}"
             path = Path(settings.UPLOAD_DIR) / fname
             data = logo.file.read()
@@ -404,6 +417,11 @@ def admin_dealership_delete(request: Request, dealership_id: int, _=Depends(admi
         d = s.get(Dealership, dealership_id)
         if d:
             before = d.model_dump() if hasattr(d, "model_dump") else {"name": d.name, "logo_url": d.logo_url}
+            if d.logo_url:
+                try:
+                    (Path(settings.UPLOAD_DIR) / Path(d.logo_url).name).unlink()
+                except FileNotFoundError:
+                    pass
             s.delete(d)
             s.commit()
             audit(

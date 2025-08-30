@@ -4,8 +4,8 @@ export default function Facets({
   maxYear, setMaxYear,
   minPrice, setMinPrice,
   maxPrice, setMaxPrice,
-  source, setSource,
-  sources
+  dealershipId, setDealershipId,
+  dealerships = []
 }) {
   return (
     <div className="facets">
@@ -38,10 +38,10 @@ export default function Facets({
         <input type="number" value={maxPrice ?? ""} onChange={e=>setMaxPrice(e.target.value?Number(e.target.value):null)} />
       </label>
       <label className="f">
-        <span>Source</span>
-        <select value={source} onChange={e=>setSource(e.target.value)}>
-          <option value="">All sources</option>
-          {sources.map(s => <option key={s} value={s}>{s}</option>)}
+        <span>Dealership</span>
+        <select value={dealershipId} onChange={e=>setDealershipId(e.target.value)}>
+          <option value="">All dealerships</option>
+          {dealerships.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
         </select>
       </label>
     </div>
