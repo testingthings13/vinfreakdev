@@ -13,6 +13,7 @@ def ensure_columns():
         have = {row[1] for row in info}
         wanted = {
             "lot_number": "TEXT",
+            "auction_status": "TEXT",
             "seller_rating": "REAL",
             "seller_reviews": "INTEGER",
             "make_id": "INTEGER",
