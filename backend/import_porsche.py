@@ -47,9 +47,6 @@ def map_price(obj):
     except:
         return None
 
-def map_image(obj):
-    imgs = obj.get("images") or []
-    return imgs[0] if imgs else None
 
 def join_list(lst):
     if isinstance(lst, list):
@@ -75,7 +72,9 @@ def normalize(item):
     interior_color = item.get("interiorColor")
     body_type = map_body_type(item)
     seller_type = item.get("sellerType")
-    image_url = map_image(item)
+    images = item.get("images") or []
+    image_url = images[0] if images else None
+    images_json = json.dumps(images, ensure_ascii=False) if images else None
     url = item.get("url")
 
     # extras
@@ -128,6 +127,7 @@ def normalize(item):
         "body_type": body_type,
         "posted_at": None,
         "image_url": image_url,
+        "images_json": images_json,
         "source": "carsandbids",
         "url": url,
         "engine": engine,

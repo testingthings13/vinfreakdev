@@ -76,6 +76,7 @@ def normalize(item):
     url = item.get("url")
     images = item.get("images") or []
     image_url = images[0] if images else None
+    images_json = json.dumps(images, ensure_ascii=False) if images else None
 
     # extra meta
     auction_status = item.get("auctionStatus") or item.get("status")
@@ -143,7 +144,7 @@ def normalize(item):
         "other_items": other_items,
         "engine": item.get("engine"),
         "image_url": image_url,
-        "images": images,
+        "images_json": images_json,
         "location_address": address,
         "location_url": location_url,
         "seller_name": seller_name,
