@@ -1,4 +1,5 @@
 import sys, json, re, requests
+from datetime import datetime
 
 API = "http://127.0.0.1:8000"
 
@@ -61,14 +62,29 @@ def normalize(item):
     address = loc.get("address")
     city = parse_city(address)
     state = parse_state(item.get("status"), address)
+    location_url = loc.get("url")
     transmission = map_transmission(item.get("transmission"))
     drivetrain = map_drivetrain(item.get("drivetrain"))
     exterior_color = item.get("exteriorColor")
     interior_color = item.get("interiorColor")
     body_type = (item.get("bodyStayle") or item.get("bodyStyle"))
     seller_type = item.get("sellerType")
-    image_url = (item.get("images") or [None])[0]
+    images = item.get("images") or []
+    image_url = images[0] if images else None
+    images_json = json.dumps(images, ensure_ascii=False) if images else None
     url = item.get("url")
+
+    lot_number = None
+    if url:
+        m = re.search(r"/auctions/([^/]+)/", url)
+        if m:
+            lot_number = m.group(1)
+
+    seller = item.get("seller") or {}
+    seller_name = seller.get("name")
+    seller_url = seller.get("url")
+    seller_rating = seller.get("rating")
+    seller_reviews = seller.get("reviews")
 
     # extras
     engine = item.get("engine")
@@ -80,6 +96,9 @@ def normalize(item):
     seller_notes = item.get("sellerNotes")
     auction_status = item.get("auctionStatus") or item.get("status")
     end_time = item.get("endTime")
+    time_left = item.get("timeLeft")
+    number_of_views = item.get("numberOfViews")
+    number_of_bids = item.get("numberOfBids")
 
     # trim guess from title
     trim = None
@@ -109,6 +128,7 @@ def normalize(item):
         "year": int(year),
         "mileage": m_val,
         "price": price,
+        "currency": (item.get("offer") or {}).get("currency"),
         "city": city,
         "state": state,
         "seller_type": seller_type,
@@ -118,19 +138,30 @@ def normalize(item):
         "drivetrain": drivetrain,
         "fuel_type": None,
         "body_type": body_type,
-        "posted_at": None,
-        "image_url": image_url,
-        "source": "porsche_json",
-        "url": url,
-        "engine": engine,
+        "auction_status": auction_status,
+        "lot_number": lot_number,
+        "end_time": end_time,
+        "time_left": time_left,
+        "number_of_views": number_of_views,
+        "number_of_bids": number_of_bids,
         "description": description,
         "highlights": highlights,
         "equipment": equipment,
         "service_history": service_history,
         "ownership_history": ownership_history,
         "seller_notes": seller_notes,
-        "auction_status": auction_status,
-        "end_time": end_time,
+        "engine": engine,
+        "location_address": address,
+        "location_url": location_url,
+        "seller_name": seller_name,
+        "seller_url": seller_url,
+        "seller_rating": seller_rating,
+        "seller_reviews": seller_reviews,
+        "posted_at": datetime.utcnow().isoformat(),
+        "image_url": image_url,
+        "images_json": images_json,
+        "source": "porsche_json",
+        "url": url,
     }
 
 def chunked(seq, n):
