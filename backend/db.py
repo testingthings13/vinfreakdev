@@ -1,7 +1,7 @@
 from sqlmodel import create_engine, SQLModel, Session
 from sqlalchemy import text
 from backend_settings import settings
-from models import Make, Model, Category, Dealership, Car
+from models import Make, Model, Category, Dealership, Car, ImportJob
 
 
 
@@ -77,6 +77,7 @@ def init_db():
             Category.__table__,
             Dealership.__table__,
             Car.__table__,
+            ImportJob.__table__,
         ],
     )
     ensure_columns()
