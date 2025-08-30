@@ -76,3 +76,24 @@ def test_json_import_skips_duplicates():
         vins = [c.vin for c in s.exec(select(Car)).all()]
     assert vins.count("EXIST1") == 1
     assert vins.count("NEW1") == 1
+
+
+def test_json_import_uses_images_field_for_hero_and_gallery():
+    _init_db()
+    data = [
+        {
+            "vin": "V1",
+            "make": "M",
+            "model": "X",
+            "images": ["hero.jpg", "gallery1.jpg", "hero.jpg", "gallery2.jpg"],
+        }
+    ]
+    upload = app_module.UploadFile(
+        filename="cars.json", file=io.BytesIO(json.dumps(data).encode("utf-8"))
+    )
+    req = DummyRequest()
+    asyncio.run(app_module.admin_cars_import(req, csrf="tok", file=upload, _=True))
+    with Session(engine) as s:
+        car = s.exec(select(Car)).first()
+        assert car.image_url == "hero.jpg"
+        assert json.loads(car.images_json) == ["gallery1.jpg", "gallery2.jpg"]

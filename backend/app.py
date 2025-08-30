@@ -770,6 +770,21 @@ async def admin_cars_import(
             if not isinstance(item, dict):
                 skipped += 1
                 continue
+            imgs_val = item.get("images")
+            if imgs_val:
+                if isinstance(imgs_val, list):
+                    imgs = [str(x).strip() for x in imgs_val if x]
+                else:
+                    imgs = _parse_images(imgs_val)
+                seen_urls = set()
+                unique = []
+                for url in imgs:
+                    if url and url not in seen_urls:
+                        unique.append(url)
+                        seen_urls.add(url)
+                if unique:
+                    item["image_url"] = unique[0]
+                    item["images_json"] = json.dumps(unique[1:]) if len(unique) > 1 else None
             data = {k: item.get(k) for k in cols}
             vin = (data.get("vin") or "").strip()
             if not vin or vin in seen_vins:

@@ -42,6 +42,12 @@ export function normalizeCar(raw) {
     }
   }
   images = images.filter(Boolean);
+  const seen = new Set();
+  images = images.filter((url) => {
+    if (seen.has(url)) return false;
+    seen.add(url);
+    return true;
+  });
 
   const status = (raw.auction_status || "").toUpperCase();
 
