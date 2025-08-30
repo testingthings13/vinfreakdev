@@ -1,7 +1,7 @@
 from sqlmodel import create_engine, SQLModel, Session
 from sqlalchemy import text
 from backend_settings import settings
-from models import Make, Model, Category, Dealership
+from models import Make, Model, Category, Dealership, Car
 
 
 
@@ -34,8 +34,25 @@ engine = create_engine(
 )
 
 def init_db():
-    # Create non-cars tables from metadata
-    SQLModel.metadata.create_all(engine, tables=[Make.__table__, Model.__table__, Category.__table__, Dealership.__table__])
+    """Initialize application database."""
+    # Create tables if they do not already exist.  Previously the ``cars``
+    # table was omitted here because the project started with a pre-existing
+    # database.  Deployments that began with an empty database therefore
+    # never had the ``cars`` table created which meant API calls like
+    # ``/cars`` would fail with "no such table: cars".  By including
+    # ``Car.__table__`` in the create_all call we ensure the table exists on
+    # fresh installs while remaining a no-op when the table is already
+    # present.
+    SQLModel.metadata.create_all(
+        engine,
+        tables=[
+            Make.__table__,
+            Model.__table__,
+            Category.__table__,
+            Dealership.__table__,
+            Car.__table__,
+        ],
+    )
     ensure_columns()
     # --- ensure cars.lot_number exists for legacy DBs ---
     try:
