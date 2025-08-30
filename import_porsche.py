@@ -67,7 +67,9 @@ def normalize(item):
     interior_color = item.get("interiorColor")
     body_type = (item.get("bodyStayle") or item.get("bodyStyle"))
     seller_type = item.get("sellerType")
-    image_url = (item.get("images") or [None])[0]
+    images = item.get("images") or []
+    image_url = images[0] if images else None
+    images_json = json.dumps(images, ensure_ascii=False) if images else None
     url = item.get("url")
 
     # extras
@@ -120,6 +122,7 @@ def normalize(item):
         "body_type": body_type,
         "posted_at": None,
         "image_url": image_url,
+        "images_json": images_json,
         "source": "porsche_json",
         "url": url,
         "engine": engine,

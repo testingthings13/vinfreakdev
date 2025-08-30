@@ -49,9 +49,10 @@ def map_price(obj):
     except:
         return None
 
-def map_image(obj):
-    imgs = obj.get("images") or []
-    return imgs[0] if imgs else None
+def join_list(lst):
+    if isinstance(lst, list):
+        return " \u2022 ".join([str(x).strip() for x in lst if str(x).strip()])
+    return None
 
 def normalize(item):
     title = item.get("title") or ""
@@ -72,8 +73,29 @@ def normalize(item):
     interior_color = item.get("interiorColor")
     body_type = map_body_type(item)
     seller_type = item.get("sellerType")
-    image_url = map_image(item)
+    images = item.get("images") or []
+    image_url = images[0] if images else None
+    images_json = json.dumps(images, ensure_ascii=False) if images else None
     url = item.get("url")
+
+    # text/detail fields
+    description = item.get("description")
+    highlights = item.get("highlights") or join_list(item.get("highlightsList"))
+    equipment = item.get("equipment") or join_list(item.get("equipmentList"))
+    modifications = join_list(item.get("modificationsList"))
+    known_flaws = join_list(item.get("knownFlowsList") or item.get("knownFlawsList"))
+    service_history = join_list(item.get("serviceHistoryList"))
+    ownership_history = item.get("ownershipHistory")
+    seller_notes = item.get("sellerNotes")
+    other_items = item.get("otherItems")
+    engine = item.get("engine")
+
+    auction_status = item.get("auctionStatus") or item.get("status")
+    end_time = item.get("endTime")
+    time_left = item.get("timeLeft")
+    number_of_views = item.get("numberOfViews")
+    number_of_bids = item.get("numberOfBids")
+    currency = (item.get("offer") or {}).get("currency")
 
     trim = None
     if make and model and title:
@@ -102,6 +124,7 @@ def normalize(item):
         "year": int(year),
         "mileage": m_val,
         "price": price,
+        "currency": currency,
         "city": city,
         "state": state,
         "seller_type": seller_type,
@@ -111,8 +134,24 @@ def normalize(item):
         "drivetrain": drivetrain,
         "fuel_type": None,
         "body_type": body_type,
+        "auction_status": auction_status,
+        "end_time": end_time,
+        "time_left": time_left,
+        "number_of_views": number_of_views,
+        "number_of_bids": number_of_bids,
+        "description": description,
+        "highlights": highlights,
+        "equipment": equipment,
+        "modifications": modifications,
+        "known_flaws": known_flaws,
+        "service_history": service_history,
+        "ownership_history": ownership_history,
+        "seller_notes": seller_notes,
+        "other_items": other_items,
+        "engine": engine,
         "posted_at": None,
         "image_url": image_url,
+        "images_json": images_json,
         "source": "carsandbids",
         "url": url,
     }
