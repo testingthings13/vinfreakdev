@@ -2,9 +2,22 @@
 
 ## Configuration
 
-The backend uses a SQLite database stored at `backend/cars.db` by default.
-You can override this by setting the `DATABASE_URL` environment variable
-to point to a different database.
+The backend reads its database connection string from the
+`DATABASE_URL` environment variable.  For local development it falls back
+to a SQLite file at `backend/cars.db` (which is ignored by git).  To keep
+data such as dealerships between deployments, point `DATABASE_URL` to a
+location on a persistent volume, e.g.:
+
+```
+DATABASE_URL=sqlite:////data/cars.db
+```
+
+or use an external database service like PostgreSQL.
+
+Admin-related data such as site settings and audit logs live in a separate
+database controlled by `ADMIN_DATABASE_URL` (defaulting to
+`backend/admin.db`).  In production, point both `DATABASE_URL` and
+`ADMIN_DATABASE_URL` at persistent storage locations.
 
 ## Import Jobs
 

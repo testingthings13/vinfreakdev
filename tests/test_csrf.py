@@ -11,6 +11,7 @@ settings = types.SimpleNamespace(
     ADMIN_USER="admin",
     ADMIN_PASS="admin",
     DATABASE_URL="sqlite://",
+    ADMIN_DATABASE_URL="sqlite://",
     UPLOAD_DIR="uploads",
     SECRET_KEY="change-me",
 )
@@ -44,6 +45,7 @@ sys.modules['sqlmodel'] = types.SimpleNamespace(
 )
 sys.modules['db'] = types.SimpleNamespace(engine=None, init_db=lambda: None)
 sys.modules['models'] = types.SimpleNamespace(Car=None, Media=None, ImportJob=None, Setting=None, AdminAudit=None, Dealership=None)
+sys.modules['admin_db'] = types.SimpleNamespace(engine=None, init_db=lambda: None)
 
 # Ensure required directories and template
 (ROOT / "static").mkdir(exist_ok=True)
