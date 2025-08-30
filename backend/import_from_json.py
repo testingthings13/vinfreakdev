@@ -79,12 +79,6 @@ def normalize(item):
     image_url = images[0] if images else None
     images_json = json.dumps(images, ensure_ascii=False) if images else None
 
-    lot_number = None
-    if url:
-        m = re.search(r"/auctions/([^/]+)/", url)
-        if m:
-            lot_number = m.group(1)
-
     # extra meta
     auction_status = item.get("auctionStatus") or item.get("status")
     end_time = item.get("endTime")

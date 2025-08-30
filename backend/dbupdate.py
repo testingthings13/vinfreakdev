@@ -35,7 +35,6 @@ CREATE TABLE IF NOT EXISTS cars (
     fuel_type TEXT,
     body_type TEXT,
     auction_status TEXT,
-    lot_number TEXT,
     end_time TEXT,
     time_left TEXT,
     number_of_views INTEGER,
@@ -50,12 +49,6 @@ CREATE TABLE IF NOT EXISTS cars (
     seller_notes TEXT,
     other_items TEXT,
     engine TEXT,
-    location_address TEXT,
-    location_url TEXT,
-    seller_name TEXT,
-    seller_url TEXT,
-    seller_rating TEXT,
-    seller_reviews TEXT,
     posted_at TEXT,
     image_url TEXT,
     images_json TEXT,
@@ -70,13 +63,6 @@ for car in data:
     INSERT OR REPLACE INTO cars (
         vin, make, model, trim, year, mileage, price, currency, city, state, seller_type,
         exterior_color, interior_color, transmission, drivetrain, fuel_type,
-        body_type, auction_status, lot_number, end_time, time_left, number_of_views, number_of_bids,
-        description, highlights, equipment, modifications, known_flaws, service_history,
-        ownership_history, seller_notes, other_items, engine,
-        location_address, location_url, seller_name, seller_url, seller_rating, seller_reviews,
-        posted_at, image_url, images_json, source, url
-    ) VALUES (
-        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
     )
     """, (
         car.get("vin"),
@@ -97,7 +83,6 @@ for car in data:
         car.get("fuel_type"),
         car.get("body_type"),
         car.get("auction_status"),
-        car.get("lot_number"),
         car.get("end_time"),
         car.get("time_left"),
         car.get("number_of_views"),
@@ -112,12 +97,6 @@ for car in data:
         car.get("seller_notes"),
         car.get("other_items"),
         car.get("engine"),
-        car.get("location_address"),
-        car.get("location_url"),
-        car.get("seller_name"),
-        car.get("seller_url"),
-        car.get("seller_rating"),
-        car.get("seller_reviews"),
         car.get("posted_at", datetime.utcnow().isoformat()),
         car.get("image_url"),
         car.get("images_json"),

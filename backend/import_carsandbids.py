@@ -80,20 +80,6 @@ def normalize(item):
     images_json = json.dumps(images, ensure_ascii=False) if images else None
     url = item.get("url")
 
-    # derive lot number from URL
-    lot_number = None
-    if url:
-        m = re.search(r"/auctions/([^/]+)/", url)
-        if m:
-            lot_number = m.group(1)
-
-    # seller info
-    seller = item.get("seller") or {}
-    seller_name = seller.get("name")
-    seller_url = seller.get("url")
-    seller_rating = seller.get("rating")
-    seller_reviews = seller.get("reviews")
-
     # text/detail fields
     description = item.get("description")
     highlights = item.get("highlights") or join_list(item.get("highlightsList"))
@@ -151,7 +137,6 @@ def normalize(item):
         "fuel_type": None,
         "body_type": body_type,
         "auction_status": auction_status,
-        "lot_number": lot_number,
         "end_time": end_time,
         "time_left": time_left,
         "number_of_views": number_of_views,
@@ -166,13 +151,6 @@ def normalize(item):
         "seller_notes": seller_notes,
         "other_items": other_items,
         "engine": engine,
-        "location_address": address,
-        "location_url": location_url,
-        "seller_name": seller_name,
-        "seller_url": seller_url,
-        "seller_rating": seller_rating,
-        "seller_reviews": seller_reviews,
-        "posted_at": datetime.utcnow().isoformat(),
         "image_url": image_url,
         "images_json": images_json,
         "source": "carsandbids",
